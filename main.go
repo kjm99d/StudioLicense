@@ -267,14 +267,6 @@ func main() {
 			middleware.SetJSONHeader,
 		))
 
-	mux.HandleFunc("/api/license/deactivate",
-		middleware.ChainMiddleware(
-			handlers.DeactivateLicense,
-			middleware.LoggingMiddleware,
-			middleware.CORSMiddleware,
-			middleware.SetJSONHeader,
-		))
-
 	// 서버 설정
 	port := ":8080"
 	server := &http.Server{

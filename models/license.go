@@ -46,6 +46,11 @@ type UpdateLicenseRequest struct {
 	Notes         string `json:"notes"`
 }
 
+// DeactivateDeviceRequest 디바이스 비활성화 요청
+type DeactivateDeviceRequest struct {
+	DeviceID string `json:"device_id" binding:"required"`
+}
+
 // IsExpired 만료 여부 확인
 func (l *License) IsExpired() bool {
 	// 만료일이 현재 시간보다 이전이면 만료된 것
