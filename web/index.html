@@ -202,7 +202,7 @@
             <div class="login-box">
                 <h1>🔐 Studio License</h1>
                 <p class="subtitle">관리자 로그인</p>
-                <form id="login-form">
+                <form id="login-form" onsubmit="handleLoginForm(event)">
                     <div class="form-group">
                         <label for="username">아이디</label>
                         <input type="text" id="username" name="username" required placeholder="admin">
@@ -226,6 +226,7 @@
                 <a href="#" data-page="dashboard" class="nav-link active">대시보드</a>
                 <a href="#" data-page="licenses" class="nav-link">라이선스</a>
                 <a href="#" data-page="products" class="nav-link">제품</a>
+                <a href="#" data-page="policies" class="nav-link">정책</a>
                 <a href="#" data-page="admins" class="nav-link" id="admins-tab" style="display:none;">관리자</a>
                 <a href="#" data-page="swagger" class="nav-link">API 문서</a>
             </div>
@@ -377,6 +378,7 @@
                             <tr>
                                 <th>라이선스 키</th>
                                 <th>제품명</th>
+                                <th>정책</th>
                                 <th>고객명</th>
                                 <th>최대 디바이스</th>
                                 <th>만료일</th>
@@ -386,13 +388,40 @@
                         </thead>
                         <tbody id="licenses-tbody">
                             <tr>
-                                <td colspan="7" class="loading">로딩 중...</td>
+                                <td colspan="8" class="loading">로딩 중...</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div id="pagination" class="pagination"></div>
+            </div>
+
+            <!-- 정책 관리 컨텐츠 -->
+            <div id="policies-content" class="content">
+                <div class="page-header">
+                    <h2>🛡️ 정책 관리</h2>
+                    <button class="btn blue" onclick="openCreatePolicyModal()">
+                        <i class="material-icons left">add</i>새 정책 생성
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>정책명</th>
+                                <th>정책 데이터</th>
+                                <th>상태</th>
+                                <th>생성/수정 시간</th>
+                                <th>작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="policies-tbody">
+                            <tr><td colspan="5" class="text-center">정책을 불러오는 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Swagger 컨텐츠 -->
@@ -451,6 +480,12 @@
                     <input type="hidden" id="product_id_hidden" name="product_id" />
                 </div>
                 <div class="form-group">
+                    <label for="policy_select">정책 선택</label>
+                    <select id="policy_select" name="policy_id" class="browser-default">
+                        <option value="">정책을 선택하세요 (선택사항)</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="customer_name">고객명 *</label>
                     <input type="text" id="customer_name" name="customer_name" required>
                 </div>
@@ -492,6 +527,58 @@
             <div id="license-detail-content" class="license-detail">
                 <!-- JavaScript로 채움 -->
             </div>
+        </div>
+    </div>
+
+    <!-- 라이선스 수정 모달 -->
+    <div id="edit-license-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ 라이선스 수정</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="edit-license-form">
+                <input type="hidden" id="edit_license_id" name="license_id">
+                <div class="form-group">
+                    <label for="edit_product_name">제품명 *</label>
+                    <input type="text" id="edit_product_name" name="product_name" required readonly style="background-color: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label for="edit_policy_select">적용 정책</label>
+                    <select id="edit_policy_select" name="policy_id" class="browser-default">
+                        <option value="">정책 없음</option>
+                    </select>
+                    <small style="color: #6b7280;">정책을 변경하거나 제거할 수 있습니다.</small>
+                </div>
+                <div class="form-group">
+                    <label for="edit_customer_name">고객명 *</label>
+                    <input type="text" id="edit_customer_name" name="customer_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_customer_email">고객 이메일 *</label>
+                    <input type="email" id="edit_customer_email" name="customer_email" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_max_devices">최대 디바이스 수 *</label>
+                    <input type="number" id="edit_max_devices" name="max_devices" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_expires_at">만료일 *</label>
+                    <input type="date" id="edit_expires_at" name="expires_at" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_notes">메모</label>
+                    <textarea id="edit_notes" name="notes" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">저장</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -563,8 +650,8 @@
                 <p style="margin-bottom: 1rem;">비활성화된 지 일정 기간이 지난 디바이스를 데이터베이스에서 삭제합니다.</p>
                 <div class="form-group">
                     <label for="cleanup-days">삭제 기준 (일)</label>
-                    <input type="number" id="cleanup-days" value="90" min="1" max="365" required style="max-width: 160px;">
-                    <small style="color: var(--secondary-color);">비활성화된 지 위 기간(일)보다 오래된 디바이스만 삭제됩니다.</small>
+                    <input type="number" id="cleanup-days" value="90" min="0" max="365" required style="max-width: 160px;">
+                    <small style="color: var(--secondary-color);">비활성화된 지 위 기간(일)보다 오래된 디바이스만 삭제됩니다. (0 = 오늘 포함 전체)</small>
                 </div>
                 <div id="cleanup-preview" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-color); border-radius: 4px; display: none;">
                     <strong>예상 삭제 대상:</strong> <span id="cleanup-count">-</span>개 디바이스
@@ -608,6 +695,73 @@
             </form>
         </div>
     </div>
+
+    <!-- 정책 생성 모달 -->
+    <div id="create-policy-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🛡️ 새 정책 생성</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="create-policy-form">
+                <div class="form-group">
+                    <label for="policy_name">정책명 *</label>
+                    <input type="text" id="policy_name" name="policy_name" placeholder="예: 프리미엄 정책" required>
+                </div>
+                <div class="form-group">
+                    <label for="policy_data">정책 데이터 (JSON) *</label>
+                    <textarea id="policy_data" name="policy_data" rows="10" placeholder='{"feature": "enabled"}' style="font-family: monospace;" required></textarea>
+                    <small style="color: #6b7280;">유효한 JSON 형식으로 입력해주세요.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">생성</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 정책 수정 모달 -->
+    <div id="edit-policy-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ 정책 수정</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="edit-policy-form">
+                <input type="hidden" id="edit_policy_id" name="policy_id">
+                <div class="form-group">
+                    <label for="edit_policy_name">정책명 *</label>
+                    <input type="text" id="edit_policy_name" name="policy_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_policy_data">정책 데이터 (JSON) *</label>
+                    <textarea id="edit_policy_data" name="policy_data" rows="12" style="font-family: monospace;" required></textarea>
+                    <small style="color: #6b7280;">유효한 JSON 형식으로 입력해주세요.</small>
+                </div>
+                <div class="form-group">
+                    <label for="edit_policy_status">상태 *</label>
+                    <select id="edit_policy_status" name="status" class="browser-default" required>
+                        <option value="active">✅ 활성</option>
+                        <option value="inactive">❌ 비활성</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Materialize JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script type="module" src="./js/main.js"></script>

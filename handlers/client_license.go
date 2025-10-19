@@ -191,12 +191,37 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 	// 활동 로그 기록
 	utils.LogDeviceActivity(deviceID, license.ID, models.DeviceActionActivated, "Device activated")
 
+	// 제품 ID 조회 및 정책 정보 가져오기
+	var productID string
+	prodQuery := "SELECT product_id FROM licenses WHERE id = ?"
+	database.DB.QueryRow(prodQuery, license.ID).Scan(&productID)
+
+	var policies []models.PolicyResponse
+	if productID != "" {
+		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ? AND status = ?`
+		rows, err := database.DB.Query(policyQuery, productID, models.PolicyStatusActive)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var p models.PolicyResponse
+				var policyDataStr string
+				err := rows.Scan(&p.ID, &p.PolicyName, &policyDataStr)
+				if err == nil {
+					// JSON 문자열을 interface{}로 파싱
+					json.Unmarshal([]byte(policyDataStr), &p.PolicyData)
+					policies = append(policies, p)
+				}
+			}
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(models.SuccessResponse("License activated successfully", map[string]interface{}{
 		"license_key":  license.LicenseKey,
 		"device_id":    deviceID,
 		"product_name": license.ProductName,
 		"expires_at":   license.ExpiresAt,
+		"policies":     policies,
 	}))
 }
 
@@ -293,10 +318,35 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 	updateQuery := "UPDATE device_activations SET last_validated_at = ? WHERE id = ?"
 	database.DB.Exec(updateQuery, time.Now().Format("2006-01-02 15:04:05"), deviceID)
 
+	// 제품 ID 조회 및 정책 정보 가져오기
+	var productID string
+	prodQuery := "SELECT product_id FROM licenses WHERE id = ?"
+	database.DB.QueryRow(prodQuery, license.ID).Scan(&productID)
+
+	var policies []models.PolicyResponse
+	if productID != "" {
+		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ? AND status = ?`
+		rows, err := database.DB.Query(policyQuery, productID, models.PolicyStatusActive)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var p models.PolicyResponse
+				var policyDataStr string
+				err := rows.Scan(&p.ID, &p.PolicyName, &policyDataStr)
+				if err == nil {
+					// JSON 문자열을 interface{}로 파싱
+					json.Unmarshal([]byte(policyDataStr), &p.PolicyData)
+					policies = append(policies, p)
+				}
+			}
+		}
+	}
+
 	json.NewEncoder(w).Encode(models.SuccessResponse("License is valid", map[string]interface{}{
 		"license_key":  license.LicenseKey,
 		"product_name": license.ProductName,
 		"expires_at":   license.ExpiresAt,
 		"valid":        true,
+		"policies":     policies,
 	}))
 }

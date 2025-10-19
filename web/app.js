@@ -163,7 +163,8 @@ async function handleChangePassword(e) {
     }
 }
 
-// 로그인 처리
+// 로그인 처리 - 이제 main.js에서 처리됨 (혼동 방지)
+/*
 async function handleLogin(e) {
     e.preventDefault();
     
@@ -195,14 +196,17 @@ async function handleLogin(e) {
         console.error('Login error:', error);
     }
 }
+*/
 
-// 로그아웃 처리
+// 로그아웃 처리 - 이제 main.js에서 처리됨
+/*
 function handleLogout() {
     token = null;
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     showLogin();
 }
+*/
 
 // 로그인 페이지 표시
 function showLogin() {
@@ -892,12 +896,15 @@ function renderDeviceCard(d) {
         </div>
         <div class="device-card-body">
             <div class="kv-list">
-                <div class="kv-row"><span class="kv-key">Hostname</span><span class="kv-val">${escapeHtml(info.Hostname || '-')}</span></div>
-                <div class="kv-row"><span class="kv-key">Machine ID</span><span class="kv-val mono">${escapeHtml(info.MachineID || '-')}</span></div>
-                <div class="kv-row"><span class="kv-key">CPU ID</span><span class="kv-val mono">${escapeHtml(info.CPUID || '-')}</span></div>
-                <div class="kv-row"><span class="kv-key">Motherboard SN</span><span class="kv-val mono">${escapeHtml(info.MotherboardSN || '-')}</span></div>
-                <div class="kv-row"><span class="kv-key">MAC Address</span><span class="kv-val mono">${escapeHtml(info.MACAddress || '-')}</span></div>
-                <div class="kv-row"><span class="kv-key">Disk Serial</span><span class="kv-val mono">${escapeHtml(info.DiskSerial || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">Client ID</span><span class="kv-val mono">${escapeHtml(info.client_id || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">Hostname</span><span class="kv-val">${escapeHtml(info.hostname || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">Machine ID</span><span class="kv-val mono">${escapeHtml(info.machine_id || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">CPU ID</span><span class="kv-val mono">${escapeHtml(info.cpu_id || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">Motherboard SN</span><span class="kv-val mono">${escapeHtml(info.motherboard_sn || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">MAC Address</span><span class="kv-val mono">${escapeHtml(info.mac_address || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">Disk Serial</span><span class="kv-val mono">${escapeHtml(info.disk_serial || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">OS</span><span class="kv-val">${escapeHtml(info.os || '-')}</span></div>
+                <div class="kv-row"><span class="kv-key">OS Version</span><span class="kv-val">${escapeHtml(info.os_version || '-')}</span></div>
             </div>
         </div>
         <div class="device-card-footer">
@@ -1043,6 +1050,41 @@ async function reactivateDevice(deviceId, deviceName, licenseId) {
     }
 }
 
+// 디바이스 삭제 (완전 삭제) - 제거됨, 대신 cleanup 기능 사용
+/*
+async function deleteDevice(deviceId, deviceName, licenseId) {
+    const ok = await showConfirm(
+        `디바이스 "${deviceName}"를 데이터베이스에서 완전히 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`,
+        '디바이스 삭제'
+    );
+    
+    if (!ok) return;
+    
+    try {
+        const response = await apiFetch(`${API_BASE_URL}/api/admin/devices/delete`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ device_id: deviceId })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.status === 'success') {
+            await showAlert('디바이스가 삭제되었습니다.', '디바이스 삭제');
+            await reloadDeviceList(licenseId);
+        } else {
+            await showAlert(result.message || '디바이스 삭제에 실패했습니다.', '디바이스 삭제');
+        }
+    } catch (error) {
+        console.error('Failed to delete device:', error);
+        await showAlert('서버 오류가 발생했습니다.', '디바이스 삭제');
+    }
+}
+*/
+
 // 활동 로그 토글
 async function toggleActivityLogs(deviceId) {
     const logsContainer = document.getElementById(`activity-logs-${deviceId}`);
@@ -1121,6 +1163,7 @@ function renderActivityLogs(logs) {
 // 디바이스 목록 부분 리로드
 async function reloadDeviceList(licenseId) {
     try {
+        // 디바이스 목록 갱신
         const res = await apiFetch(`${API_BASE_URL}/api/admin/licenses/devices?id=${licenseId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1137,6 +1180,35 @@ async function reloadDeviceList(licenseId) {
         } else {
             container.classList.remove('loading');
             container.textContent = body.message || '디바이스 정보를 불러오지 못했습니다.';
+        }
+        
+        // 상세 창의 디바이스 슬롯 정보도 갱신
+        const licenseRes = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${licenseId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const licenseData = await licenseRes.json();
+        if (licenseRes.ok && licenseData.status === 'success') {
+            const license = licenseData.data;
+            const activeDevices = license.active_devices || 0;
+            const remainingDevices = license.max_devices - activeDevices;
+            const deviceUsage = `${remainingDevices}/${license.max_devices}`;
+            
+            // 상세 창에서 디바이스 슬롯 값 찾아서 업데이트
+            const detailGroups = document.querySelectorAll('.detail-group');
+            detailGroups.forEach(group => {
+                const label = group.querySelector('.detail-label');
+                if (label && label.textContent === '디바이스 슬롯') {
+                    const valueEl = group.querySelector('.detail-value');
+                    if (valueEl) {
+                        valueEl.textContent = deviceUsage;
+                    }
+                }
+            });
+        }
+        
+        // 라이선스 목록도 갱신 (디바이스 수 업데이트)
+        if (window.loadLicenses) {
+            window.loadLicenses(currentPage);
         }
     } catch (e) {
         console.error('Failed to reload device list:', e);
@@ -1157,15 +1229,16 @@ function openCleanupModal() {
 async function handleCleanupDevices(e) {
     const days = parseInt(document.getElementById('cleanup-days').value);
 
-    if (!days || days < 1) {
-        await showAlert('유효한 일수를 입력해주세요.', '입력 오류');
+    if (isNaN(days) || days < 0) {
+        await showAlert('0 이상의 유효한 일수를 입력해주세요.', '입력 오류');
         return;
     }
 
-    const ok = await showConfirm(
-        `비활성화된 지 ${days}일이 지난 디바이스를 모두 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`,
-        '디바이스 정리'
-    );
+    const message = days === 0 
+        ? `모든 비활성 디바이스를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+        : `비활성화된 지 ${days}일이 지난 디바이스를 모두 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`;
+
+    const ok = await showConfirm(message, '디바이스 정리');
 
     if (!ok) return;
 
@@ -1208,6 +1281,14 @@ async function handleCleanupDevices(e) {
 
 // Window 객체에 전역 함수 노출
 window.handleChangePassword = handleChangePassword;
-window.handleLogin = handleLogin;
-window.handleLogout = handleLogout;
+window.renderDeviceCard = renderDeviceCard;
+window.deactivateDevice = deactivateDevice;
+window.reactivateDevice = reactivateDevice;
+// window.deleteDevice = deleteDevice;  // 제거됨, cleanup 사용
+window.toggleActivityLogs = toggleActivityLogs;
+window.copyToClipboard = copyToClipboard;
+window.openCleanupModal = openCleanupModal;
+window.handleCleanupDevices = handleCleanupDevices;
+// window.handleLogin = handleLogin;  // main.js에서 처리됨
+// window.handleLogout = handleLogout;  // main.js에서 처리됨
 

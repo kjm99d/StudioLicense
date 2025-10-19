@@ -1,5 +1,9 @@
 // 제품 관리 페이지
 
+import { state } from '../state.js';
+import { showAlert, openModal, closeModal } from '../modals.js';
+import { apiFetch, API_BASE_URL } from '../api.js';
+
 async function loadProducts() {
     try {
         console.log('Loading products...', state.token);
@@ -234,18 +238,13 @@ function initProductsPage() {
     // NOTE: product-form 제출 이벤트는 main.js의 setupEventListeners()에서 등록됨 (중복 방지)
 }
 
-// 페이지 로드 시 초기화
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initProductsPage);
-} else {
-    initProductsPage();
-}
-
 // 전역으로 노출 (main.js에서 window.loadProducts 호출용)
 window.loadProducts = loadProducts;
 window.showProductModal = showProductModal;
 window.closeProductModal = closeProductModal;
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
+
+export { loadProducts, showProductModal, initProductsPage };
 window.deleteProductConfirm = deleteProductConfirm;
 

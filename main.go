@@ -180,6 +180,17 @@ func main() {
 			middleware.SetJSONHeader,
 		))
 
+	// 디바이스 개별 삭제 API (관리자, 인증 필요)
+	mux.HandleFunc("/api/admin/devices/delete",
+		middleware.ChainMiddleware(
+			handlers.DeleteDevice,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.RequireRoles("super_admin", "admin"),
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
 	// 제품 관리 API (인증 필요)
 	mux.HandleFunc("/api/admin/products",
 		middleware.ChainMiddleware(
@@ -193,6 +204,25 @@ func main() {
 	mux.HandleFunc("/api/admin/products/",
 		middleware.ChainMiddleware(
 			productDetailHandler,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	// 정책 관리 API (인증 필요)
+	mux.HandleFunc("/api/admin/policies",
+		middleware.ChainMiddleware(
+			policyHandler,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	mux.HandleFunc("/api/admin/policies/",
+		middleware.ChainMiddleware(
+			policyDetailHandler,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
 			middleware.CORSMiddleware,
@@ -390,6 +420,32 @@ func productDetailHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		handlers.DeleteProduct(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// policyHandler 정책 목록/생성 핸들러
+func policyHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handlers.GetAllPolicies(w, r)
+	case http.MethodPost:
+		handlers.CreatePolicy(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// policyDetailHandler 정책 상세/수정/삭제 핸들러
+func policyDetailHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handlers.GetPolicy(w, r)
+	case http.MethodPut:
+		handlers.UpdatePolicy(w, r)
+	case http.MethodDelete:
+		handlers.DeletePolicy(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

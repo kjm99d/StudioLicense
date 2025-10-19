@@ -122,7 +122,7 @@ export function openDialog({ title = '알림', message = '', showCancel = false 
   }
 
   // Ensure dialog is always on top
-  state.topZIndex = Math.max(state.topZIndex, 13000) + 4;
+  state.topZIndex = Math.max(state.topZIndex, 15000) + 4;
   modal.style.zIndex = String(state.topZIndex);
   const contentEl = modal.querySelector('.modal-content');
   if (contentEl) contentEl.style.zIndex = String(state.topZIndex + 1);

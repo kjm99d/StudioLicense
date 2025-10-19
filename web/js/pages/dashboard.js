@@ -54,8 +54,13 @@ export async function loadRecentActivities() {
               'delete_admin': '🗑️',
               'create_product': '📦',
               'update_product': '🛠️',
+              'delete_product': '🗑️',
               'create_license': '🎫',
               'update_license': '🛠️',
+              'delete_license': '🗑️',
+              'create_policy': '🛡️',
+              'update_policy': '✏️',
+              'delete_policy': '🗑️',
               'deactivate_device': '👮',
               'reactivate_device': '👮',
               'cleanup_devices': '🧹'

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"studiolicense/database"
@@ -75,6 +76,35 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 정책 ID가 있으면 정책 정보 조회 및 검증
+	var policyID *string
+	if req.PolicyID != "" {
+		var policyStatus string
+		query := "SELECT status FROM policies WHERE id = ?"
+		err := database.DB.QueryRow(query, req.PolicyID).Scan(&policyStatus)
+
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Policy not found", nil))
+			return
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to verify policy", err))
+			return
+		}
+
+		// 정책이 inactive 상태면 사용 불가
+		if policyStatus != models.PolicyStatusActive {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Policy is not active", nil))
+			return
+		}
+
+		policyID = &req.PolicyID
+	}
+
 	// 라이선스 키 생성
 	licenseKey, err := utils.GenerateLicenseKey()
 	if err != nil {
@@ -93,13 +123,13 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 
 	// DB에 저장
 	query := `
-		INSERT INTO licenses (id, license_key, product_id, product_name, customer_name, 
+		INSERT INTO licenses (id, license_key, product_id, policy_id, product_name, customer_name, 
 			customer_email, max_devices, expires_at, status, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = database.DB.Exec(query,
-		id, licenseKey, productID, req.ProductName, req.CustomerName,
+		id, licenseKey, productID, policyID, req.ProductName, req.CustomerName,
 		req.CustomerEmail, req.MaxDevices, expiresAtStr, models.LicenseStatusActive,
 		req.Notes, now, now,
 	)
@@ -122,6 +152,7 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 		ID:            id,
 		LicenseKey:    licenseKey,
 		ProductID:     productID,
+		PolicyID:      policyID,
 		ProductName:   req.ProductName,
 		CustomerName:  req.CustomerName,
 		CustomerEmail: req.CustomerEmail,
@@ -191,9 +222,14 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 
 	// 데이터 조회
 	offset := (page - 1) * pageSize
-	query := `SELECT id, license_key, product_id, product_name, customer_name, 
-		customer_email, max_devices, expires_at, status, notes, created_at, updated_at 
-		FROM licenses WHERE 1=1`
+	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id, l.product_name, 
+		COALESCE(p.policy_name, '') as policy_name,
+		l.customer_name, l.customer_email, l.max_devices,
+		COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
+		l.expires_at, l.status, l.notes, l.created_at, l.updated_at 
+		FROM licenses l
+		LEFT JOIN policies p ON l.policy_id = p.id
+		WHERE 1=1`
 
 	if status != "" {
 		query += " AND status = ?"
@@ -217,8 +253,9 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var license models.License
 		err := rows.Scan(
-			&license.ID, &license.LicenseKey, &license.ProductID, &license.ProductName,
-			&license.CustomerName, &license.CustomerEmail, &license.MaxDevices,
+			&license.ID, &license.LicenseKey, &license.ProductID, &license.PolicyID, &license.ProductName,
+			&license.PolicyName, &license.CustomerName, &license.CustomerEmail, &license.MaxDevices,
+			&license.ActiveDevices,
 			&license.ExpiresAt, &license.Status, &license.Notes,
 			&license.CreatedAt, &license.UpdatedAt,
 		)
@@ -267,13 +304,19 @@ func GetLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var license models.License
-	query := `SELECT id, license_key, product_id, product_name, customer_name, 
-		customer_email, max_devices, expires_at, status, notes, created_at, updated_at 
-		FROM licenses WHERE id = ?`
+	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id, l.product_name, 
+		COALESCE(p.policy_name, '') as policy_name,
+		l.customer_name, l.customer_email, l.max_devices,
+		COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
+		l.expires_at, l.status, l.notes, l.created_at, l.updated_at 
+		FROM licenses l
+		LEFT JOIN policies p ON l.policy_id = p.id
+		WHERE l.id = ?`
 
 	err := database.DB.QueryRow(query, id).Scan(
-		&license.ID, &license.LicenseKey, &license.ProductID, &license.ProductName,
-		&license.CustomerName, &license.CustomerEmail, &license.MaxDevices,
+		&license.ID, &license.LicenseKey, &license.ProductID, &license.PolicyID, &license.ProductName,
+		&license.PolicyName, &license.CustomerName, &license.CustomerEmail, &license.MaxDevices,
+		&license.ActiveDevices,
 		&license.ExpiresAt, &license.Status, &license.Notes,
 		&license.CreatedAt, &license.UpdatedAt,
 	)
@@ -324,13 +367,66 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 		expiresAtStr = expiresTime.Format("2006-01-02")
 	}
 
+	// 정책 ID 검증 (빈 문자열이 아닌 경우만)
+	var policyID *string
+	if req.PolicyID != "" {
+		var policyStatus string
+		query := "SELECT status FROM policies WHERE id = ?"
+		err := database.DB.QueryRow(query, req.PolicyID).Scan(&policyStatus)
+
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Policy not found", nil))
+			return
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to verify policy", err))
+			return
+		}
+
+		// 정책이 inactive 상태면 사용 불가
+		if policyStatus != models.PolicyStatusActive {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Policy is not active", nil))
+			return
+		}
+
+		policyID = &req.PolicyID
+	}
+
+	// 최대 디바이스 수 검증: 현재 활성 디바이스 수보다 작게 설정 불가
+	if req.MaxDevices > 0 {
+		var activeCount int
+		countQuery := "SELECT COUNT(*) FROM device_activations WHERE license_id = ? AND status = ?"
+		err := database.DB.QueryRow(countQuery, id, models.DeviceStatusActive).Scan(&activeCount)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to check active devices", err))
+			return
+		}
+
+		if req.MaxDevices < activeCount {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse(
+				fmt.Sprintf("Cannot reduce max devices to %d. Currently %d devices are active. Please deactivate devices first.",
+					req.MaxDevices, activeCount),
+				nil))
+			return
+		}
+	}
+
+	// policy_id 포함한 업데이트 쿼리
 	query := `UPDATE licenses SET product_name = ?, customer_name = ?,
-		customer_email = ?, max_devices = ?, expires_at = ?, notes = ?, updated_at = ?
+		customer_email = ?, max_devices = ?, expires_at = ?, notes = ?, policy_id = ?, updated_at = ?
 		WHERE id = ?`
 
 	_, err := database.DB.Exec(query,
 		req.ProductName, req.CustomerName,
 		req.CustomerEmail, req.MaxDevices, expiresAtStr, req.Notes,
+		policyID,
 		time.Now().Format("2006-01-02 15:04:05"), id,
 	)
 

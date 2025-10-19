@@ -102,6 +102,7 @@ func createTables() error {
 			id VARCHAR(50) PRIMARY KEY,
 			license_key VARCHAR(255) UNIQUE NOT NULL,
 			product_id VARCHAR(50),
+			policy_id VARCHAR(50),
 			product_name VARCHAR(255) NOT NULL,
 			customer_name VARCHAR(255) NOT NULL,
 			customer_email VARCHAR(100) NOT NULL,
@@ -111,7 +112,18 @@ func createTables() error {
 			notes TEXT,
 			created_at VARCHAR(50) NOT NULL DEFAULT '',
 			updated_at VARCHAR(50) NOT NULL DEFAULT '',
-			FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+			FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+			FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE SET NULL
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
+		// 정책 테이블
+		`CREATE TABLE IF NOT EXISTS policies (
+			id VARCHAR(50) PRIMARY KEY,
+			policy_name VARCHAR(255) UNIQUE NOT NULL,
+			policy_data LONGTEXT NOT NULL,
+			status VARCHAR(50) NOT NULL DEFAULT 'active',
+			created_at VARCHAR(50) NOT NULL DEFAULT '',
+			updated_at VARCHAR(50) NOT NULL DEFAULT ''
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 디바이스 활성화 테이블
@@ -162,6 +174,8 @@ func createTables() error {
 		`CREATE INDEX IF NOT EXISTS idx_licenses_product ON licenses(product_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_licenses_expires ON licenses(expires_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_policies_product ON policies(product_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_policies_status ON policies(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_license ON device_activations(license_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_fingerprint ON device_activations(device_fingerprint)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_status ON device_activations(status)`,

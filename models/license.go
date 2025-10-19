@@ -7,10 +7,13 @@ type License struct {
 	ID            string  `json:"id" db:"id"`
 	LicenseKey    string  `json:"license_key" db:"license_key"`
 	ProductID     *string `json:"product_id" db:"product_id"`
+	PolicyID      *string `json:"policy_id" db:"policy_id"`
 	ProductName   string  `json:"product_name" db:"product_name"`
+	PolicyName    string  `json:"policy_name" db:"policy_name"`
 	CustomerName  string  `json:"customer_name" db:"customer_name"`
 	CustomerEmail string  `json:"customer_email" db:"customer_email"`
 	MaxDevices    int     `json:"max_devices" db:"max_devices"`
+	ActiveDevices int     `json:"active_devices" db:"active_devices"` // 활성 디바이스 수
 	ExpiresAt     string  `json:"expires_at" db:"expires_at"`
 	Status        string  `json:"status" db:"status"` // active, revoked, expired
 	Notes         string  `json:"notes" db:"notes"`
@@ -28,6 +31,7 @@ const (
 // CreateLicenseRequest 라이선스 생성 요청
 type CreateLicenseRequest struct {
 	ProductID     string `json:"product_id"` // 제품 ID (선택사항)
+	PolicyID      string `json:"policy_id"`  // 정책 ID (선택사항)
 	ProductName   string `json:"product_name" binding:"required"`
 	CustomerName  string `json:"customer_name" binding:"required"`
 	CustomerEmail string `json:"customer_email" binding:"required,email"`
@@ -38,6 +42,7 @@ type CreateLicenseRequest struct {
 
 // UpdateLicenseRequest 라이선스 수정 요청
 type UpdateLicenseRequest struct {
+	PolicyID      string `json:"policy_id"` // 정책 ID (선택사항, 빈 문자열이면 정책 제거)
 	ProductName   string `json:"product_name"`
 	CustomerName  string `json:"customer_name"`
 	CustomerEmail string `json:"customer_email"`

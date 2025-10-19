@@ -294,14 +294,16 @@ func CleanupInactiveDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Days <= 0 {
-		req.Days = 90 // 기본값: 90일
+	if req.Days < 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Days must be 0 or greater", nil))
+		return
 	}
 
-	cutoffDate := time.Now().AddDate(0, 0, -req.Days)
+	cutoffDate := time.Now().AddDate(0, 0, -req.Days).Format("2006-01-02 15:04:05")
 
 	query := `DELETE FROM device_activations 
-		WHERE status = ? AND deactivated_at IS NOT NULL AND deactivated_at < ?`
+		WHERE status = ? AND deactivated_at IS NOT NULL AND deactivated_at <= ?`
 
 	result, err := database.DB.Exec(query, models.DeviceStatusDeactivated, cutoffDate)
 	if err != nil {
@@ -320,6 +322,7 @@ func CleanupInactiveDevices(w http.ResponseWriter, r *http.Request) {
 	logger.WithFields(map[string]interface{}{
 		"request_id":    requestID,
 		"days":          req.Days,
+		"cutoff_date":   cutoffDate,
 		"rows_affected": rowsAffected,
 	}).Info("Inactive devices cleaned up")
 
@@ -335,4 +338,83 @@ func CleanupInactiveDevices(w http.ResponseWriter, r *http.Request) {
 		details := "Cleanup inactive devices (days=" + strconv.Itoa(req.Days) + ") deleted=" + strconv.FormatInt(rowsAffected, 10)
 		utils.LogAdminActivity(adminID, username, models.AdminActionCleanupDevices, details)
 	}
+}
+
+// DeleteDevice 디바이스 개별 삭제 (관리자)
+// @Summary 디바이스 개별 삭제
+// @Description 특정 디바이스를 데이터베이스에서 완전히 삭제합니다
+// @Tags 관리자 - 디바이스
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body object{device_id=string} true "디바이스 ID"
+// @Success 200 {object} models.APIResponse "삭제 성공"
+// @Failure 400 {object} models.APIResponse "잘못된 요청"
+// @Failure 404 {object} models.APIResponse "디바이스 없음"
+// @Failure 500 {object} models.APIResponse "서버 에러"
+// @Router /api/admin/devices/delete [post]
+func DeleteDevice(w http.ResponseWriter, r *http.Request) {
+	requestID := r.Context().Value("request_id")
+
+	var req struct {
+		DeviceID string `json:"device_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Invalid request body", err))
+		return
+	}
+
+	if req.DeviceID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Device ID is required", nil))
+		return
+	}
+
+	// 디바이스 존재 확인
+	var deviceName string
+	checkQuery := "SELECT device_name FROM device_activations WHERE id = ?"
+	err := database.DB.QueryRow(checkQuery, req.DeviceID).Scan(&deviceName)
+
+	if err != nil {
+		logger.WithFields(map[string]interface{}{
+			"request_id": requestID,
+			"device_id":  req.DeviceID,
+		}).Warn("Device not found")
+
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Device not found", nil))
+		return
+	}
+
+	// 디바이스 삭제
+	deleteQuery := "DELETE FROM device_activations WHERE id = ?"
+	_, err = database.DB.Exec(deleteQuery, req.DeviceID)
+	if err != nil {
+		logger.WithFields(map[string]interface{}{
+			"request_id": requestID,
+			"device_id":  req.DeviceID,
+			"error":      err.Error(),
+		}).Error("Failed to delete device")
+
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to delete device", err))
+		return
+	}
+
+	logger.WithFields(map[string]interface{}{
+		"request_id":  requestID,
+		"device_id":   req.DeviceID,
+		"device_name": deviceName,
+	}).Info("Device deleted by admin")
+
+	// 관리자 활동 로그 기록
+	if adminIDRaw := r.Context().Value("admin_id"); adminIDRaw != nil {
+		adminID := adminIDRaw.(string)
+		username, _ := r.Context().Value("username").(string)
+		utils.LogAdminActivity(adminID, username, "delete_device", "Device deleted: "+deviceName+" ("+req.DeviceID+")")
+	}
+
+	json.NewEncoder(w).Encode(models.SuccessResponse("Device deleted successfully", nil))
 }

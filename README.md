@@ -4,25 +4,71 @@
 
 ## 주요 기능
 
-- Super Admin & Sub Admin 계층
+### 👥 관리자 시스템
+- **Super Admin & Sub Admin 계층 구조**
 - Sub Admin 관리 (생성, 비밀번호 초기화, 삭제)
-- 라이선스 관리 (생성, 조회, 수정, 삭제)
-- 제품 관리
-- 디바이스 관리
-- 대시보드 및 활동 로깅
+- 역할 기반 접근 제어 (RBAC)
+- 비밀번호 변경 기능
+
+### 🎫 라이선스 관리
+- 라이선스 생성, 조회, 수정, 삭제
+- 제품별 라이선스 발급
+- **정책 기반 라이선스 제어** (신규)
+- 라이선스 상태 관리 (활성/만료/폐기)
+- 최대 디바이스 수 제한
+- 만료일 관리
+
+### 🛡️ 정책 관리 (Policy System)
+- **제품과 독립적인 정책 시스템**
+- 정책 생성, 수정, 삭제
+- JSON 형식의 유연한 정책 데이터
+- 정책 활성/비활성 상태 관리
+- 라이선스에 정책 할당 및 변경
+- 정책 삭제 시 라이선스 정책 변경 가능
+
+### 📦 제품 관리
+- 제품 CRUD 기능
+- 제품별 상태 관리
+- 제품별 라이선스 통계
+
+### 🖥️ 디바이스 관리
+- 하드웨어 핑거프린트 기반 디바이스 인증
+- 디바이스 활성화/비활성화
+- 디바이스별 활동 로그
+- 비활성 디바이스 자동 정리 (90일 이상)
+
+### 📊 대시보드 & 로깅
+- 실시간 통계 (라이선스, 디바이스)
+- 관리자 활동 로그
+- 디바이스 활동 로그
+- 필터링 및 검색 기능
 
 ## 요구사항
 
 - Go 1.21 이상
-- MySQL 8.0 이상
+- SQLite (기본) 또는 MySQL 8.0 이상
 
 ## 데이터베이스 셋업
 
-### MySQL 데이터베이스 생성
+### SQLite (기본값)
+
+별도 설정 없이 바로 실행 가능합니다. `studiolicense.db` 파일이 자동으로 생성됩니다.
+
+```go
+// main.go (기본값)
+database.Initialize("sqlite", "./studiolicense.db")
+```
+
+### MySQL 사용 시
 
 ```bash
-# MySQL에서 데이터베이스 생성 (문자열 인코딩 설정)
+# MySQL에서 데이터베이스 생성
 mysql -u root -p -e "CREATE DATABASE studiolicense CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+```go
+// main.go에서 MySQL로 변경
+database.Initialize("mysql", "root:root@tcp(localhost:3306)/studiolicense")
 ```
 
 ### 자동 테이블 생성
@@ -31,34 +77,20 @@ Go 서버를 실행하면 다음 테이블들이 **자동으로 생성**됩니�
 
 - **admins** - 관리자 계정 (ID, 비밀번호, 역할)
 - **products** - 제품 정보
-- **licenses** - 라이선스 키 및 활성화 정보
+- **policies** - 정책 정보 (신규)
+- **licenses** - 라이선스 키 및 활성화 정보 (정책 ID 포함)
 - **device_activations** - 디바이스별 활성화 기록
 - **admin_activity_logs** - 관리자 작업 로그
 - **device_activity_logs** - 디바이스 접근 로그
 
 > **별도의 마이그레이션 작업은 필요 없습니다.** 데이터베이스만 생성하면 나머지는 모두 자동으로 처리됩니다.
 
-### MySQL 연결 설정
-
-**main.go의 database.Initialize 호출 부분 (기본값):**
-
-```go
-// MySQL 연결 (기본값)
-database.Initialize("mysql", "root:root@tcp(localhost:3306)/studiolicense")
-```
-
-**MySQL 접속 정보를 변경하려면:**
-
-```go
-// 형식: database.Initialize("mysql", "username:password@tcp(host:port)/dbname")
-database.Initialize("mysql", "myuser:mypassword@tcp(192.168.1.100:3306)/studiolicense")
-```
-
 ## 설치 및 실행
 
-### 1단계: MySQL 데이터베이스 생성
+### 1단계: 프로젝트 클론
 ```bash
-mysql -u root -p -e "CREATE DATABASE studiolicense CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+git clone https://github.com/kjm99d/StudioLicense.git
+cd StudioLicense
 ```
 
 ### 2단계: 의존성 설치
@@ -75,123 +107,303 @@ go run main.go
 > - ✅ 테이블 생성 (CREATE TABLE IF NOT EXISTS)
 > - ✅ 기본 관리자 계정 생성 (admin / admin123) - 첫 실행 시에만
 > - ✅ 샘플 제품 생성 - 첫 실행 시에만
+> - ✅ 만료된 라이선스 자동 체크 (매일 00:00)
 
 ### 4단계: 웹 접속
 ```
 http://localhost:8080/web/
-- Username: admin
-- Password: admin123
 ```
 
-### 재시작 시 동작
-- 데이터베이스 종료 → 재시작 시 **데이터는 모두 보존됨** ✅
-- 테이블/기본 관리자는 **다시 생성되지 않음** ✅
-- 테이블이 이미 존재하면 CREATE TABLE IF NOT EXISTS는 아무 작업도 하지 않음
+**기본 관리자 계정:**
+- Username: `admin`
+- Password: `admin123`
+
+> ⚠️ **첫 로그인 후 반드시 비밀번호를 변경하세요!**
 
 ## 관리자 역할
 
-### Super Admin
-- 모든 관리 기능
-- Sub Admin 관리
+### Super Admin (최고 관리자)
+- ✅ 모든 관리 기능 접근
+- ✅ Sub Admin 생성, 수정, 삭제
+- ✅ 디바이스 정리 기능
+- ✅ 모든 활동 로그 조회
 
-### Admin
-- 라이선스 관리
-- 제품 관리
-- 디바이스 관리
-- 대시보드 조회
+### Admin (일반 관리자)
+- ✅ 라이선스 관리
+- ✅ 제품 관리
+- ✅ 정책 관리
+- ✅ 디바이스 조회 및 관리
+- ✅ 대시보드 조회
+- ❌ Sub Admin 관리 불가
+- ❌ 디바이스 정리 불가
+
+## 정책 시스템 (Policy System)
+
+### 정책이란?
+
+정책은 라이선스에 적용할 수 있는 규칙이나 설정을 JSON 형식으로 정의한 것입니다.
+
+### 정책 예시
+
+```json
+{
+  "feature": "premium",
+  "max_projects": 100,
+  "export_formats": ["mp4", "avi", "mov"],
+  "cloud_storage": true
+}
+```
+
+### 정책 관리
+
+1. **정책 생성**: 정책명과 JSON 데이터로 정책 생성
+2. **정책 수정**: 정책 데이터 및 상태(활성/비활성) 수정
+3. **정책 삭제**: 정책 삭제 (연결된 라이선스는 정책 없음으로 변경)
+4. **라이선스에 적용**: 라이선스 생성 시 또는 수정 시 정책 선택
+
+### 라이선스-정책 관계
+
+- 라이선스는 **선택적으로** 하나의 정책을 가질 수 있음
+- 정책 없이도 라이선스 발급 가능
+- 라이선스 수정 시 정책 변경 가능
+- 정책 삭제 시 해당 정책을 사용하는 라이선스의 정책을 변경 필요
 
 ## API 엔드포인트
 
-> 상세한 API 문서는 `/docs/swagger.json` 또는 `/docs/swagger.yaml` 참고
+### 관리자 인증 API
+- `POST /api/admin/login` - 로그인
+- `POST /api/admin/change-password` - 비밀번호 변경
+- `GET /api/admin/me` - 현재 관리자 정보
 
-### 관리자 API
-- POST /api/admin/login - 로그인
-- GET /api/admin/me - 현재 관리자 정보
-- GET /api/admin/admins - Sub Admin 목록
-- POST /api/admin/admins/create - Sub Admin 생성
-- POST /api/admin/admins/{id}/reset-password - 비밀번호 초기화
-- DELETE /api/admin/admins/{id} - Sub Admin 삭제
-- GET/POST/PUT/DELETE /api/admin/licenses - 라이선스 관리
-- GET/POST/PUT/DELETE /api/admin/products - 제품 관리
-- GET /api/admin/dashboard/* - 대시보드 및 활동 로그
+### 관리자 관리 API (Super Admin 전용)
+- `GET /api/admin/admins` - Sub Admin 목록
+- `POST /api/admin/admins/create` - Sub Admin 생성
+- `POST /api/admin/admins/:id/reset-password` - 비밀번호 초기화
+- `DELETE /api/admin/admins/:id` - Sub Admin 삭제
+
+### 라이선스 관리 API
+- `GET /api/admin/licenses` - 라이선스 목록 (페이징, 필터링)
+- `GET /api/admin/licenses?id={id}` - 라이선스 상세
+- `POST /api/admin/licenses` - 라이선스 생성
+- `PUT /api/admin/licenses?id={id}` - 라이선스 수정
+- `DELETE /api/admin/licenses?id={id}` - 라이선스 삭제
+- `GET /api/admin/licenses/devices?id={id}` - 라이선스 디바이스 목록
+
+### 정책 관리 API (신규)
+- `GET /api/admin/policies` - 정책 목록
+- `GET /api/admin/policies/:id` - 정책 상세
+- `POST /api/admin/policies` - 정책 생성
+- `PUT /api/admin/policies/:id` - 정책 수정
+- `DELETE /api/admin/policies/:id` - 정책 삭제
+
+### 제품 관리 API
+- `GET /api/admin/products` - 제품 목록
+- `POST /api/admin/products` - 제품 생성
+- `PUT /api/admin/products/:id` - 제품 수정
+- `DELETE /api/admin/products/:id` - 제품 삭제
+
+### 디바이스 관리 API
+- `POST /api/admin/devices/deactivate` - 디바이스 비활성화
+- `POST /api/admin/devices/reactivate` - 디바이스 재활성화
+- `POST /api/admin/devices/cleanup` - 비활성 디바이스 정리
+
+### 대시보드 API
+- `GET /api/admin/dashboard/stats` - 통계 조회
+- `GET /api/admin/dashboard/activities` - 활동 로그 조회
 
 ### 클라이언트 API (인증 불필요)
-- POST /api/license/activate - 라이선스 활성화
-- POST /api/license/validate - 라이선스 검증
-- POST /api/license/deactivate - 라이선스 비활성화
+- `POST /api/license/activate` - 라이선스 활성화
+- `POST /api/license/validate` - 라이선스 검증
+
+> 📚 상세한 API 문서는 `http://localhost:8080/swagger/` 에서 확인 가능
 
 ## 프로젝트 구조
 
 ```
 StudioLicense/
-├── main.go                    # 서버 진입점
+├── main.go                    # 서버 진입점 및 라우팅
 ├── go.mod                     # Go 모듈 정의
+├── go.sum                     # 의존성 체크섬
+│
 ├── database/
-│   └── database.go            # DB 초기화 및 스키마
+│   └── database.go            # DB 초기화 및 스키마 생성
+│
 ├── models/                    # 데이터 모델
-│   ├── admin.go
-│   ├── admin_activity.go
-│   ├── device.go
-│   ├── device_log.go
-│   ├── license.go
-│   ├── product.go
-│   └── response.go
+│   ├── admin.go               # 관리자 모델
+│   ├── admin_activity.go      # 관리자 활동 로그
+│   ├── device.go              # 디바이스 모델
+│   ├── device_log.go          # 디바이스 활동 로그
+│   ├── license.go             # 라이선스 모델
+│   ├── product.go             # 제품 모델
+│   ├── policy.go              # 정책 모델 (신규)
+│   └── response.go            # API 응답 구조
+│
 ├── handlers/                  # API 핸들러
-│   ├── admin_device.go
-│   ├── admin_license.go
-│   ├── admin_user.go
-│   ├── auth.go
-│   ├── client_license.go
-│   ├── dashboard.go
-│   └── product.go
+│   ├── admin_device.go        # 디바이스 관리
+│   ├── admin_license.go       # 라이선스 관리
+│   ├── admin_policy.go        # 정책 관리 (신규)
+│   ├── admin_user.go          # Sub Admin 관리
+│   ├── auth.go                # 인증
+│   ├── client_license.go      # 클라이언트 API
+│   ├── dashboard.go           # 대시보드
+│   └── product.go             # 제품 관리
+│
 ├── middleware/                # 미들웨어
-│   ├── logging.go
-│   └── roles.go
+│   ├── logging.go             # 요청/응답 로깅
+│   └── roles.go               # 역할 기반 접근 제어
+│
 ├── utils/                     # 유틸리티
-│   ├── admin_log.go
-│   ├── crypto.go
-│   ├── device_log.go
-│   └── jwt.go
+│   ├── admin_log.go           # 관리자 활동 로깅
+│   ├── crypto.go              # 암호화 (bcrypt, hash)
+│   ├── device_log.go          # 디바이스 활동 로깅
+│   └── jwt.go                 # JWT 토큰 생성/검증
+│
 ├── scheduler/                 # 스케줄러
-│   └── scheduler.go
+│   └── scheduler.go           # 크론 작업 (만료 체크 등)
+│
 ├── logger/                    # 로거
-│   └── logger.go
+│   └── logger.go              # 구조화된 로깅
+│
 ├── web/                       # 프론트엔드
-│   ├── index.html
-│   ├── styles.css
-│   ├── app.js
-│   ├── products.js
+│   ├── index.html             # 메인 HTML
+│   ├── styles.css             # 전역 스타일
+│   ├── app.js                 # 레거시 JS (디바이스 렌더링)
+│   ├── products.js            # 제품 관리 JS
 │   └── js/
-│       ├── api.js
-│       ├── main.js
-│       ├── modals.js
-│       ├── state.js
-│       ├── ui.js
-│       ├── utils.js
+│       ├── api.js             # API 호출 유틸
+│       ├── main.js            # 메인 앱 로직
+│       ├── modals.js          # 모달 시스템
+│       ├── state.js           # 전역 상태 관리
+│       ├── ui.js              # UI 헬퍼
+│       ├── utils.js           # 유틸리티 함수
+│       ├── legacy-bridge.js   # 레거시 코드 브릿지
 │       └── pages/
-│           ├── admins.js
-│           ├── dashboard.js
-│           └── licenses.js
-├── logs/                      # 로그 디렉토리 (자동 생성)
-└── README.md
+│           ├── admins.js      # 관리자 페이지
+│           ├── dashboard.js   # 대시보드 페이지
+│           ├── licenses.js    # 라이선스 페이지
+│           ├── policies.js    # 정책 페이지 (신규)
+│           └── products.js    # 제품 페이지
+│
+├── docs/                      # Swagger API 문서
+│   ├── docs.go
+│   ├── swagger.json
+│   └── swagger.yaml
+│
+├── logs/                      # 로그 파일 (자동 생성)
+├── studiolicense.db           # SQLite DB (자동 생성)
+├── API_TESTS.md               # API 테스트 가이드
+└── README.md                  # 이 파일
 ```
 
-## 보안
+## 보안 기능
 
-- JWT 토큰 기반 인증
-- bcrypt 비밀번호 해싱
-- 디바이스 핑거프린트 해싱
-- 역할 기반 접근 제어
-- 활동 로깅
+### 인증 & 권한
+- ✅ JWT 토큰 기반 인증 (Bearer Token)
+- ✅ bcrypt 비밀번호 해싱 (cost 10)
+- ✅ 역할 기반 접근 제어 (Super Admin / Admin)
+- ✅ 토큰 만료 시간 관리
 
-## 개선사항
+### 데이터 보호
+- ✅ 디바이스 핑거프린트 해싱 (SHA-256)
+- ✅ SQL Injection 방지 (Prepared Statement)
+- ✅ XSS 방지 (HTML Escape)
 
-- 모달 스타일링 개선
-- Sub Admin 관리 기능
-- 상태 뱃지 일관성
-- API 응답 캐싱
-- 활동 로그 한글 표시
+### 감사 추적
+- ✅ 모든 관리자 활동 로깅
+- ✅ 디바이스 활동 로깅
+- ✅ 로그인 시도 기록
+
+## 최근 업데이트
+
+### v2.0.0 - 정책 시스템 도입 (2025-10-20)
+
+#### 신규 기능
+- 🛡️ **정책 관리 시스템 추가**
+  - 제품과 독립적인 정책 시스템
+  - JSON 기반 유연한 정책 데이터
+  - 정책 CRUD 기능
+  - 정책 활성/비활성 상태 관리
+
+- 🎫 **라이선스-정책 연동**
+  - 라이선스 생성 시 정책 선택
+  - 라이선스 수정 시 정책 변경
+  - 정책 없이도 라이선스 발급 가능
+
+- 🎨 **UI/UX 개선**
+  - 정책 관리 페이지 추가
+  - 라이선스 수정 모달 추가
+  - 테이블 버튼 순서 개선 (상세-수정-삭제)
+  - 일관된 디자인 시스템 적용
+
+- 📊 **활동 로그 강화**
+  - 정책 생성/수정/삭제 로그
+  - 라이선스 수정 로그
+  - 이모지 아이콘으로 가독성 향상
+
+#### 개선사항
+- 라이선스 테이블에 정책 컬럼 추가
+- 라이선스 상세 페이지에 정책 정보 표시
+- 정책 삭제 시 라이선스 영향도 처리
+- 모달 스타일 및 레이아웃 개선
+
+## 개발 가이드
+
+### 새로운 API 추가
+
+1. `models/` 에 데이터 모델 추가
+2. `handlers/` 에 핸들러 함수 작성
+3. `main.go` 에 라우트 등록
+4. Swagger 주석 추가 (`@Summary`, `@Description` 등)
+
+### 프론트엔드 페이지 추가
+
+1. `web/js/pages/` 에 페이지 JS 파일 생성
+2. `web/index.html` 에 HTML 섹션 추가
+3. `web/js/main.js` 에서 import 및 라우팅 연결
+4. 필요한 모달을 `index.html` 에 추가
+
+### 데이터베이스 스키마 변경
+
+1. `database/database.go` 에서 `CREATE TABLE` 문 수정
+2. 기존 DB 백업 후 삭제하고 재실행하여 테이블 재생성
+3. 또는 `ALTER TABLE` 문을 직접 실행
+
+## 문제 해결
+
+### 포트 충돌 (8080 사용 중)
+```bash
+# Windows
+netstat -ano | findstr :8080
+taskkill /PID <PID> /F
+
+# Linux/Mac
+lsof -i :8080
+kill -9 <PID>
+```
+
+### 데이터베이스 연결 실패
+- MySQL 서비스가 실행 중인지 확인
+- 접속 정보(username, password, host) 확인
+- 데이터베이스가 생성되었는지 확인
+
+### 로그인 실패
+- 기본 계정: `admin / admin123`
+- 비밀번호를 잊었다면 DB에서 직접 수정 또는 DB 재생성
 
 ## 라이선스
 
-MIT
+MIT License
+
+## 기여
+
+이슈와 PR은 언제나 환영합니다!
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 문의
+
+프로젝트 관련 문의사항은 Issues 탭을 이용해주세요.

@@ -37,6 +37,13 @@ definitions:
       username:
         type: string
     type: object
+  models.ChangePasswordRequest:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    type: object
   models.CreateLicenseRequest:
     properties:
       customer_email:
@@ -50,9 +57,13 @@ definitions:
         type: integer
       notes:
         type: string
-      product_name:
+      policy_id:
+        description: 정책 ID (선택사항)
         type: string
-      product_version:
+      product_id:
+        description: 제품 ID (선택사항)
+        type: string
+      product_name:
         type: string
     required:
     - customer_email
@@ -61,18 +72,30 @@ definitions:
     - max_devices
     - product_name
     type: object
-  models.DeactivateRequest:
+  models.CreatePolicyRequest:
     properties:
-      device_info:
-        $ref: '#/definitions/models.DeviceInfo'
-      license_key:
+      policy_data:
+        description: JSON 형식
+        type: string
+      policy_name:
         type: string
     required:
-    - device_info
-    - license_key
+    - policy_data
+    - policy_name
+    type: object
+  models.CreateProductRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
     type: object
   models.DeviceInfo:
     properties:
+      client_id:
+        type: string
       cpu_id:
         type: string
       disk_serial:
@@ -92,6 +115,9 @@ definitions:
     type: object
   models.License:
     properties:
+      active_devices:
+        description: 활성 디바이스 수
+        type: integer
       created_at:
         type: string
       customer_email:
@@ -108,9 +134,13 @@ definitions:
         type: integer
       notes:
         type: string
-      product_name:
+      policy_id:
         type: string
-      product_version:
+      policy_name:
+        type: string
+      product_id:
+        type: string
+      product_name:
         type: string
       status:
         description: active, revoked, expired
@@ -158,6 +188,57 @@ definitions:
       total_pages:
         type: integer
     type: object
+  models.Policy:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      policy_data:
+        description: JSON 형식의 정책 데이터
+        type: string
+      policy_name:
+        type: string
+      status:
+        description: active, inactive
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.Product:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        description: active, inactive
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.UpdatePolicyRequest:
+    properties:
+      policy_data:
+        type: string
+      policy_name:
+        type: string
+      status:
+        type: string
+    type: object
+  models.UpdateProductRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+    type: object
   models.ValidateRequest:
     properties:
       device_info:
@@ -181,6 +262,190 @@ info:
   title: Studio License Server API
   version: "1.0"
 paths:
+  /api/admin/change-password:
+    post:
+      consumes:
+      - application/json
+      description: 현재 비밀번호를 확인하고 새로운 비밀번호로 변경합니다
+      parameters:
+      - description: 비밀번호 변경 요청
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 변경 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 필요/현재 비밀번호 불일치
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 비밀번호 변경
+      tags:
+      - 인증
+  /api/admin/devices/cleanup:
+    post:
+      consumes:
+      - application/json
+      description: N일 이상 비활성 상태인 디바이스를 삭제합니다
+      parameters:
+      - description: 비활성 기간 (일)
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            days:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 정리 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 비활성 디바이스 자동 정리
+      tags:
+      - 관리자 - 디바이스
+  /api/admin/devices/deactivate:
+    post:
+      consumes:
+      - application/json
+      description: 관리자가 특정 디바이스를 강제로 비활성화합니다
+      parameters:
+      - description: 디바이스 ID
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            device_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 비활성화 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 디바이스 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 디바이스 비활성화 (관리자)
+      tags:
+      - 관리자 - 디바이스
+  /api/admin/devices/logs:
+    get:
+      consumes:
+      - application/json
+      description: 특정 디바이스의 활동 로그를 조회합니다
+      parameters:
+      - description: 디바이스 ID
+        in: query
+        name: device_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 로그 조회 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 디바이스 활동 로그 조회
+      tags:
+      - 관리자 - 디바이스
+  /api/admin/devices/reactivate:
+    post:
+      consumes:
+      - application/json
+      description: 관리자가 비활성화된 디바이스를 다시 활성화합니다
+      parameters:
+      - description: 디바이스 ID
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            device_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 재활성화 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 디바이스 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "409":
+          description: 이미 활성 상태 또는 슬롯 초과
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 디바이스 재활성화 (관리자)
+      tags:
+      - 관리자 - 디바이스
   /api/admin/licenses:
     get:
       consumes:
@@ -381,6 +646,377 @@ paths:
       summary: 현재 사용자 정보 조회
       tags:
       - 인증
+  /api/admin/policies:
+    get:
+      consumes:
+      - application/json
+      description: 모든 정책을 조회합니다
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 조회 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 필요
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 모든 정책 조회
+      tags:
+      - 관리자 - 정책
+    post:
+      consumes:
+      - application/json
+      description: 새로운 정책을 생성합니다
+      parameters:
+      - description: 정책 정보
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreatePolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 생성 성공
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Policy'
+              type: object
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 필요
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "409":
+          description: 정책명 중복
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 정책 생성
+      tags:
+      - 관리자 - 정책
+  /api/admin/policies/{policy_id}:
+    delete:
+      consumes:
+      - application/json
+      description: 정책을 삭제합니다
+      parameters:
+      - description: 정책 ID
+        in: path
+        name: policy_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 삭제 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 필요
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 정책 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 정책 삭제
+      tags:
+      - 관리자 - 정책
+    get:
+      consumes:
+      - application/json
+      description: 특정 정책의 상세 정보를 조회합니다
+      parameters:
+      - description: 정책 ID
+        in: path
+        name: policy_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 조회 성공
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Policy'
+              type: object
+        "404":
+          description: 정책 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 정책 상세 조회
+      tags:
+      - 관리자 - 정책
+    put:
+      consumes:
+      - application/json
+      description: 기존 정책을 수정합니다
+      parameters:
+      - description: 정책 ID
+        in: path
+        name: policy_id
+        required: true
+        type: string
+      - description: 수정 정보
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdatePolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 수정 성공
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Policy'
+              type: object
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 필요
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 정책 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 정책 수정
+      tags:
+      - 관리자 - 정책
+  /api/admin/products:
+    get:
+      consumes:
+      - application/json
+      description: 모든 제품 목록을 조회합니다
+      parameters:
+      - description: 상태 필터 (active, inactive)
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 조회 성공
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Product'
+                  type: array
+              type: object
+        "401":
+          description: 인증 필요
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 제품 목록 조회
+      tags:
+      - 제품
+    post:
+      consumes:
+      - application/json
+      description: 새로운 제품을 생성합니다
+      parameters:
+      - description: 제품 정보
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 생성 성공
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Product'
+              type: object
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 필요
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 제품 생성
+      tags:
+      - 제품
+  /api/admin/products/:
+    delete:
+      consumes:
+      - application/json
+      description: 제품을 삭제합니다. 연결된 라이선스가 있으면 삭제가 제한됩니다(RESTRICT).
+      parameters:
+      - description: 제품 ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 삭제 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "409":
+          description: 연결된 라이선스로 인해 삭제 불가
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 제품 삭제
+      tags:
+      - 제품
+    get:
+      consumes:
+      - application/json
+      description: 특정 제품의 상세 정보를 조회합니다
+      parameters:
+      - description: 제품 ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 조회 성공
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Product'
+              type: object
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 제품 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 제품 상세 조회
+      tags:
+      - 제품
+    put:
+      consumes:
+      - application/json
+      description: 제품 정보를 수정합니다
+      parameters:
+      - description: 제품 ID
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: 수정할 정보
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 수정 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 제품 수정
+      tags:
+      - 제품
   /api/license/activate:
     post:
       consumes:
@@ -421,40 +1057,6 @@ paths:
           schema:
             $ref: '#/definitions/models.APIResponse'
       summary: 라이선스 활성화
-      tags:
-      - 클라이언트 - 라이선스
-  /api/license/deactivate:
-    post:
-      consumes:
-      - application/json
-      description: 디바이스에서 라이선스를 비활성화합니다
-      parameters:
-      - description: 비활성화 정보
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/models.DeactivateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 비활성화 성공
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "400":
-          description: 잘못된 요청
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "404":
-          description: 라이선스 또는 디바이스 없음
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      summary: 라이선스 비활성화
       tags:
       - 클라이언트 - 라이선스
   /api/license/validate:
