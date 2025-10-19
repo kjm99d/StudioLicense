@@ -106,6 +106,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 
 	// 디바이스 핑거프린트 생성
 	fingerprint := utils.GenerateDeviceFingerprint(
+		req.DeviceInfo.ClientID,
 		req.DeviceInfo.CPUID,
 		req.DeviceInfo.MotherboardSN,
 		req.DeviceInfo.MACAddress,
@@ -263,6 +264,7 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 
 	// 디바이스 핑거프린트 생성
 	fingerprint := utils.GenerateDeviceFingerprint(
+		req.DeviceInfo.ClientID,
 		req.DeviceInfo.CPUID,
 		req.DeviceInfo.MotherboardSN,
 		req.DeviceInfo.MACAddress,

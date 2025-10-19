@@ -46,8 +46,9 @@ func GenerateID(prefix string) (string, error) {
 }
 
 // GenerateDeviceFingerprint 디바이스 정보로 핑거프린트 생성
-func GenerateDeviceFingerprint(cpuID, motherboardSN, macAddr, diskSerial, machineID string) string {
-	data := fmt.Sprintf("%s|%s|%s|%s|%s",
+func GenerateDeviceFingerprint(clientID, cpuID, motherboardSN, macAddr, diskSerial, machineID string) string {
+	data := fmt.Sprintf("%s|%s|%s|%s|%s|%s",
+		clientID,
 		cpuID,
 		motherboardSN,
 		macAddr,

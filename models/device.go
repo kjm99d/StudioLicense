@@ -21,6 +21,7 @@ const (
 
 // DeviceInfo 디바이스 정보 구조체 (클라이언트에서 전달)
 type DeviceInfo struct {
+	ClientID      string `json:"client_id"`
 	CPUID         string `json:"cpu_id"`
 	MotherboardSN string `json:"motherboard_sn"`
 	MACAddress    string `json:"mac_address"`
