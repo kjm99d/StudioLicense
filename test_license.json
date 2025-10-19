@@ -1,0 +1,8 @@
+{
+  "productName": "Test Product",
+  "customerName": "Test Customer",
+  "customerEmail": "test@example.com",
+  "maxDevices": 5,
+  "expiresAt": "2026-10-19",
+  "notes": "Test license"
+}

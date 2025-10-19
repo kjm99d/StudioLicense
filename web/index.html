@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio License Admin</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Materialize CSS & Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+        <!-- Override Materialize CSS modal styles for our custom modals -->
+        <style>
+            /* Materialize CSS 모달 스타일 완전히 재정의 */
+            .modal.studio-modal { 
+                position: fixed !important; 
+                top: 0 !important; 
+                left: 0 !important; 
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 100% !important; 
+                height: 100% !important; 
+                background: rgba(0, 0, 0, 0.5) !important;
+                z-index: 14000 !important; 
+                display: flex !important; 
+                align-items: center !important; 
+                justify-content: center !important; 
+                opacity: 0 !important; 
+                visibility: hidden !important; 
+                pointer-events: none !important; 
+                transition: opacity .2s ease !important;
+                max-height: none !important;
+                overflow: visible !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            .modal.studio-modal.active { 
+                opacity: 1 !important; 
+                visibility: visible !important; 
+                pointer-events: auto !important; 
+            }
+            .modal.studio-modal .modal-content { 
+                background: #fff !important; 
+                border-radius: 12px !important; 
+                max-width: 600px !important; 
+                width: 90% !important; 
+                max-height: 90vh !important; 
+                overflow-y: auto !important; 
+                transform: translateY(-8px) scale(.98) !important; 
+                opacity: .98 !important; 
+                transition: transform .2s ease, opacity .2s ease, box-shadow .2s ease !important; 
+                box-shadow: 0 1px 3px rgba(0,0,0,.1) !important; 
+                z-index: 14001 !important;
+                position: relative !important;
+                border: none !important;
+                outline: none !important;
+                padding: 0 !important;
+            }
+            .modal.studio-modal.active .modal-content { 
+                transform: translateY(0) scale(1) !important; 
+                opacity: 1 !important; 
+                box-shadow: 0 10px 15px rgba(0,0,0,.1) !important; 
+            }
+            .modal.studio-modal .modal-header { 
+                display: flex !important; 
+                justify-content: space-between !important; 
+                align-items: center !important; 
+                padding: 1.5rem !important; 
+                border-bottom: 1px solid #e5e7eb !important; 
+            }
+            .modal.studio-modal .modal-body {
+                padding: 1.5rem !important;
+            }
+            .modal.studio-modal .modal-footer { 
+                display: flex !important; 
+                justify-content: flex-end !important; 
+                gap: .5rem !important; 
+                padding: 1rem 1.5rem !important; 
+                border-top: 1px solid #e5e7eb !important; 
+            }
+            /* 모달 닫기 버튼 스타일 */
+            .modal.studio-modal .modal-close {
+                background: none !important;
+                border: none !important;
+                padding: 0.25rem !important;
+                cursor: pointer !important;
+                color: #6b7280 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 4px !important;
+                transition: all 0.2s ease !important;
+                width: 32px !important;
+                height: 32px !important;
+                min-width: unset !important;
+                box-shadow: none !important;
+                text-transform: none !important;
+                line-height: 1 !important;
+                margin: 0 !important;
+            }
+            .modal.studio-modal .modal-close:hover {
+                background: #f3f4f6 !important;
+                color: #111827 !important;
+            }
+            .modal.studio-modal .modal-close:focus {
+                outline: 2px solid #3b82f6 !important;
+                outline-offset: 2px !important;
+            }
+            /* 모달 푸터 버튼 스타일 재정의 */
+            .modal.studio-modal .modal-footer button {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 0.5rem 1.5rem !important;
+                border-radius: 6px !important;
+                font-size: 1rem !important;
+                font-weight: 500 !important;
+                cursor: pointer !important;
+                transition: all 0.2s ease !important;
+                text-transform: none !important;
+                line-height: 1.5 !important;
+                white-space: nowrap !important;
+                min-width: 80px !important;
+                height: auto !important;
+                border: 1px solid transparent !important;
+                box-shadow: none !important;
+                letter-spacing: normal !important;
+                vertical-align: middle !important;
+            }
+            .modal.studio-modal .modal-footer .btn {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 0.5rem 1.5rem !important;
+                margin: 0 !important;
+            }
+            .modal.studio-modal .modal-footer .btn.grey,
+            .modal.studio-modal .modal-footer .btn.grey.darken-1 {
+                background-color: #757575 !important;
+                color: #fff !important;
+                border: none !important;
+            }
+            .modal.studio-modal .modal-footer .btn.grey:hover,
+            .modal.studio-modal .modal-footer .btn.grey.darken-1:hover {
+                background-color: #616161 !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            }
+            .modal.studio-modal .modal-footer .btn.blue {
+                background-color: #2196F3 !important;
+                color: #fff !important;
+                border: none !important;
+            }
+            .modal.studio-modal .modal-footer .btn.blue:hover {
+                background-color: #1976D2 !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            }
+            .modal.studio-modal .modal-footer .btn.green {
+                background-color: #4CAF50 !important;
+                color: #fff !important;
+                border: none !important;
+            }
+            .modal.studio-modal .modal-footer .btn.green:hover {
+                background-color: #388E3C !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            }
+            /* Materialize의 modal-overlay 제거 */
+            .modal-overlay {
+                display: none !important;
+            }
+            /* Materialize 버튼의 모든 기본 스타일 무력화 */
+            .modal.studio-modal button.btn,
+            .modal.studio-modal button.btn-large,
+            .modal.studio-modal button.btn-small,
+            .modal.studio-modal button.btn-flat {
+                text-decoration: none !important;
+                color: #fff !important;
+                text-align: center !important;
+                letter-spacing: normal !important;
+                transition: background-color 0.2s ease !important;
+                cursor: pointer !important;
+                border: none !important;
+                border-radius: 6px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: auto !important;
+                line-height: 1.5 !important;
+                padding: 0.5rem 1.5rem !important;
+                text-transform: none !important;
+                vertical-align: middle !important;
+                -webkit-tap-highlight-color: transparent !important;
+                box-shadow: none !important;
+                outline: 0 !important;
+                min-width: 80px !important;
+            }
+        </style>
+</head>
+<body>
+    <!-- 로그인 페이지 -->
+    <div id="login-page" class="page active">
+        <div class="login-container">
+            <div class="login-box">
+                <h1>🔐 Studio License</h1>
+                <p class="subtitle">관리자 로그인</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="username">아이디</label>
+                        <input type="text" id="username" name="username" required placeholder="admin">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">비밀번호</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••">
+                    </div>
+                    <button type="submit" class="btn blue" style="width:100%">로그인</button>
+                    <div id="login-error" class="error-message"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 대시보드 -->
+    <div id="dashboard-page" class="page">
+        <nav class="app-nav">
+            <div class="nav-brand">🎫 Studio License</div>
+            <div class="nav-menu">
+                <a href="#" data-page="dashboard" class="nav-link active">대시보드</a>
+                <a href="#" data-page="licenses" class="nav-link">라이선스</a>
+                <a href="#" data-page="products" class="nav-link">제품</a>
+                <a href="#" data-page="admins" class="nav-link" id="admins-tab" style="display:none;">관리자</a>
+                <a href="#" data-page="swagger" class="nav-link">API 문서</a>
+            </div>
+            <div class="nav-user">
+                <div class="user-badge">
+                    <svg class="user-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <span id="user-name">Admin</span>
+                </div>
+                <button id="change-password-btn" class="btn btn-sm">비밀번호 변경</button>
+                <button id="logout-btn" class="btn btn-sm">로그아웃</button>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- 대시보드 컨텐츠 -->
+            <div id="dashboard-content" class="content active">
+                <h2>📊 대시보드</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📋</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="total-licenses">-</div>
+                            <div class="stat-label">총 라이선스</div>
+                        </div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="active-licenses">-</div>
+                            <div class="stat-label">활성 라이선스</div>
+                        </div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-icon">⏰</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="expired-licenses">-</div>
+                            <div class="stat-label">만료된 라이선스</div>
+                        </div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="stat-icon">💻</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="total-devices">-</div>
+                            <div class="stat-label">활성 디바이스</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>최근 활동</h3>
+                    <div style="display:flex; gap:8px; align-items:center; margin: 8px 0 12px;">
+                        <select id="activities-type" class="browser-default" style="max-width: 160px;">
+                            <option value="">전체</option>
+                            <option value="device">디바이스</option>
+                            <option value="admin">관리자</option>
+                        </select>
+                        <input id="activities-action" placeholder="액션 필터 (예: validated, login)" style="flex:1;"/>
+                        <input id="activities-limit" type="number" min="1" max="100" value="20" style="width:90px;"/>
+                        <button id="activities-apply" class="btn btn-small grey lighten-1">적용</button>
+                    </div>
+                    <div id="recent-activities" class="activity-list">
+                        <div class="loading">로딩 중...</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3>디바이스 관리</h3>
+                        <button id="cleanup-devices-btn" class="btn amber darken-1">🗑️ 비활성 디바이스 정리</button>
+                    </div>
+                    <p style="color: var(--secondary-color); font-size: 0.9rem;">
+                        오래된 비활성 디바이스를 삭제하여 데이터베이스를 정리할 수 있습니다.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 관리자 관리 컨텐츠 (슈퍼 관리자 전용) -->
+            <div id="admins-content" class="content">
+                <div class="page-header">
+                    <h2>👥 관리자 관리</h2>
+                    <button id="create-admin-btn" class="btn green">+ 서브 관리자 생성</button>
+                </div>
+                <div class="table-container">
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>아이디</th>
+                                <th>이메일</th>
+                                <th>역할</th>
+                                <th>생성일</th>
+                                <th>작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admins-tbody">
+                            <tr><td colspan="5" class="text-center">로딩 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 제품 관리 컨텐츠 -->
+            <div id="products-content" class="content">
+                <div class="page-header">
+                    <h2>📦 제품 관리</h2>
+                    <button id="create-product-btn" class="btn blue">+ 제품 생성</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>제품명</th>
+                                <th>설명</th>
+                                <th>상태</th>
+                                <th>생성일</th>
+                                <th>작업</th>
+                            </tr>
+                        <tbody id="products-table">
+                            <tr>
+                                <td colspan="6" class="text-center">로딩 중...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 라이선스 관리 컨텐츠 -->
+            <div id="licenses-content" class="content">
+                <div class="page-header">
+                    <h2>🎫 라이선스 관리</h2>
+                    <button id="create-license-btn" class="btn btn-primary">+ 새 라이선스</button>
+                </div>
+
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="검색 (라이선스 키, 고객명, 이메일)">
+                    <select id="status-filter" class="browser-default" style="max-width: 180px;">
+                        <option value="">전체 상태</option>
+                        <option value="active">활성</option>
+                        <option value="expired">만료</option>
+                        <option value="revoked">폐기</option>
+                    </select>
+                </div>
+
+                <div id="licenses-table" class="table-container">
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>라이선스 키</th>
+                                <th>제품명</th>
+                                <th>고객명</th>
+                                <th>최대 디바이스</th>
+                                <th>만료일</th>
+                                <th>상태</th>
+                                <th>작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="licenses-tbody">
+                            <tr>
+                                <td colspan="7" class="loading">로딩 중...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="pagination" class="pagination"></div>
+            </div>
+
+            <!-- Swagger 컨텐츠 -->
+            <div id="swagger-content" class="content">
+                <h2>📚 API 문서</h2>
+                <iframe src="/swagger/index.html" style="width: 100%; height: calc(100vh - 200px); border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- 제품 생성/수정 모달 -->
+    <div id="product-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="product-modal-title">새 제품 생성</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="product-form">
+                <div class="form-group">
+                    <label for="product_name_input">제품명 *</label>
+                    <input type="text" id="product_name_input" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="product_description">설명</label>
+                    <textarea id="product_description" name="description" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">생성</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 라이선스 생성/수정 모달 -->
+    <div id="license-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">새 라이선스 생성</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="license-form">
+                <div class="form-group">
+                    <label for="product_select">제품 선택 *</label>
+                    <select id="product_select" required class="browser-default">
+                        <option value="" disabled selected>제품을 선택하세요</option>
+                    </select>
+                    <input type="hidden" id="product_id_hidden" name="product_id" />
+                </div>
+                <div class="form-group">
+                    <label for="customer_name">고객명 *</label>
+                    <input type="text" id="customer_name" name="customer_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="customer_email">고객 이메일 *</label>
+                    <input type="email" id="customer_email" name="customer_email" required>
+                </div>
+                <div class="form-group">
+                    <label for="max_devices">최대 디바이스 수 *</label>
+                    <input type="number" id="max_devices" name="max_devices" min="1" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="expires_at">만료일 *</label>
+                    <input type="date" id="expires_at" name="expires_at" required>
+                </div>
+                <div class="form-group">
+                    <label for="notes">메모</label>
+                    <textarea id="notes" name="notes" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">생성</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 라이선스 상세 모달 -->
+    <div id="license-detail-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>라이선스 상세</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="license-detail-content" class="license-detail">
+                <!-- JavaScript로 채움 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 비밀번호 변경 모달 -->
+    <div id="change-password-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>비밀번호 변경</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="change-password-form">
+                <div class="form-group">
+                    <label for="current_password">현재 비밀번호</label>
+                    <input type="password" id="current_password" name="old_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="new_password">새 비밀번호 (8자 이상)</label>
+                    <input type="password" id="new_password" name="new_password" minlength="8" required>
+                </div>
+                <div class="form-group">
+                    <label for="new_password_confirm">새 비밀번호 확인</label>
+                    <input type="password" id="new_password_confirm" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">변경</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 공통 메시지/확인 모달 -->
+    <div id="dialog-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="dialog-title">알림</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="dialog-message">메시지</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="dialog-cancel" class="btn grey darken-1" style="display:none;">취소</button>
+                <button type="button" id="dialog-ok" class="btn blue">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 디바이스 정리 모달 -->
+    <div id="cleanup-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🗑️ 비활성 디바이스 정리</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">비활성화된 지 일정 기간이 지난 디바이스를 데이터베이스에서 삭제합니다.</p>
+                <div class="form-group">
+                    <label for="cleanup-days">삭제 기준 (일)</label>
+                    <input type="number" id="cleanup-days" value="90" min="1" max="365" required style="max-width: 160px;">
+                    <small style="color: var(--secondary-color);">비활성화된 지 위 기간(일)보다 오래된 디바이스만 삭제됩니다.</small>
+                </div>
+                <div id="cleanup-preview" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-color); border-radius: 4px; display: none;">
+                    <strong>예상 삭제 대상:</strong> <span id="cleanup-count">-</span>개 디바이스
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">취소</button>
+                <button type="button" id="cleanup-confirm-btn" class="btn btn-danger">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 서브 관리자 생성 모달 (슈퍼 전용) -->
+    <div id="create-admin-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>서브 관리자 생성</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="create-admin-form">
+                <div class="form-group">
+                    <label for="admin_username">아이디 *</label>
+                    <input type="text" id="admin_username" name="username" minlength="3" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_email">이메일 *</label>
+                    <input type="email" id="admin_email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_password">비밀번호 (8자 이상) *</label>
+                    <input type="password" id="admin_password" name="password" minlength="8" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn green">생성</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Materialize JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script type="module" src="./js/main.js"></script>
+
+    <!-- 글로벌 로딩 오버레이 -->
+    <div id="global-loading" class="loading-overlay" style="display:none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">불러오는 중...</div>
+        </div>
+    </div>
+</body>
+</html>
