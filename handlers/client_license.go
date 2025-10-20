@@ -191,15 +191,15 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 	// 활동 로그 기록
 	utils.LogDeviceActivity(deviceID, license.ID, models.DeviceActionActivated, "Device activated")
 
-	// 제품 ID 조회 및 정책 정보 가져오기
-	var productID string
-	prodQuery := "SELECT product_id FROM licenses WHERE id = ?"
-	database.DB.QueryRow(prodQuery, license.ID).Scan(&productID)
+	// 정책 ID 조회 및 정책 정보 가져오기
+	var policyID sql.NullString
+	policyIDQuery := "SELECT policy_id FROM licenses WHERE id = ?"
+	database.DB.QueryRow(policyIDQuery, license.ID).Scan(&policyID)
 
 	var policies []models.PolicyResponse
-	if productID != "" {
-		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ?`
-		rows, err := database.DB.Query(policyQuery, productID)
+	if policyID.Valid && policyID.String != "" {
+		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE id = ?`
+		rows, err := database.DB.Query(policyQuery, policyID.String)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
@@ -318,15 +318,15 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 	updateQuery := "UPDATE device_activations SET last_validated_at = ? WHERE id = ?"
 	database.DB.Exec(updateQuery, time.Now().Format("2006-01-02 15:04:05"), deviceID)
 
-	// 제품 ID 조회 및 정책 정보 가져오기
-	var productID string
-	prodQuery := "SELECT product_id FROM licenses WHERE id = ?"
-	database.DB.QueryRow(prodQuery, license.ID).Scan(&productID)
+	// 정책 ID 조회 및 정책 정보 가져오기
+	var policyID sql.NullString
+	policyIDQuery := "SELECT policy_id FROM licenses WHERE id = ?"
+	database.DB.QueryRow(policyIDQuery, license.ID).Scan(&policyID)
 
 	var policies []models.PolicyResponse
-	if productID != "" {
-		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ?`
-		rows, err := database.DB.Query(policyQuery, productID)
+	if policyID.Valid && policyID.String != "" {
+		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE id = ?`
+		rows, err := database.DB.Query(policyQuery, policyID.String)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
