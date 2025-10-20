@@ -11,8 +11,8 @@ import (
 func StartScheduler() {
 	logger.Info("Scheduler started")
 
-	// 매일 자정에 실행
-	ticker := time.NewTicker(24 * time.Hour)
+	// 1시간마다 실행
+	ticker := time.NewTicker(1 * time.Hour)
 
 	// 서버 시작 시 즉시 한 번 실행
 	go func() {

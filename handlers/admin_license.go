@@ -76,18 +76,12 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 정책 ID가 있으면 정책 정보 조회 및 검증
+	// 정책 ID가 있으면 정책 존재 여부만 확인
 	var policyID *string
 	if req.PolicyID != "" {
-		var policyStatus string
-		query := "SELECT status FROM policies WHERE id = ?"
-		err := database.DB.QueryRow(query, req.PolicyID).Scan(&policyStatus)
-
-		if err == sql.ErrNoRows {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(models.ErrorResponse("Policy not found", nil))
-			return
-		}
+		var policyExists int
+		query := "SELECT COUNT(*) FROM policies WHERE id = ?"
+		err := database.DB.QueryRow(query, req.PolicyID).Scan(&policyExists)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -95,10 +89,9 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 정책이 inactive 상태면 사용 불가
-		if policyStatus != models.PolicyStatusActive {
+		if policyExists == 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(models.ErrorResponse("Policy is not active", nil))
+			json.NewEncoder(w).Encode(models.ErrorResponse("Policy not found", nil))
 			return
 		}
 
@@ -370,15 +363,9 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 	// 정책 ID 검증 (빈 문자열이 아닌 경우만)
 	var policyID *string
 	if req.PolicyID != "" {
-		var policyStatus string
-		query := "SELECT status FROM policies WHERE id = ?"
-		err := database.DB.QueryRow(query, req.PolicyID).Scan(&policyStatus)
-
-		if err == sql.ErrNoRows {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(models.ErrorResponse("Policy not found", nil))
-			return
-		}
+		var policyExists int
+		query := "SELECT COUNT(*) FROM policies WHERE id = ?"
+		err := database.DB.QueryRow(query, req.PolicyID).Scan(&policyExists)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -386,10 +373,9 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 정책이 inactive 상태면 사용 불가
-		if policyStatus != models.PolicyStatusActive {
+		if policyExists == 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(models.ErrorResponse("Policy is not active", nil))
+			json.NewEncoder(w).Encode(models.ErrorResponse("Policy not found", nil))
 			return
 		}
 

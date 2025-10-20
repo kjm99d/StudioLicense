@@ -198,8 +198,8 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 
 	var policies []models.PolicyResponse
 	if productID != "" {
-		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ? AND status = ?`
-		rows, err := database.DB.Query(policyQuery, productID, models.PolicyStatusActive)
+		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ?`
+		rows, err := database.DB.Query(policyQuery, productID)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
@@ -325,8 +325,8 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 
 	var policies []models.PolicyResponse
 	if productID != "" {
-		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ? AND status = ?`
-		rows, err := database.DB.Query(policyQuery, productID, models.PolicyStatusActive)
+		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE product_id = ?`
+		rows, err := database.DB.Query(policyQuery, productID)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {

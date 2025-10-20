@@ -207,15 +207,15 @@ async function updatePolicyDropdown() {
     const body = await res.json();
     const policies = body.data || [];
     
-    // 활성 정책만 표시
-    policies.filter(p => p.status === 'active').forEach(p => {
+    // 모든 정책 표시
+    policies.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = p.policy_name;
       policySelect.appendChild(opt);
     });
     
-    console.log('Active policies loaded:', policies.filter(p => p.status === 'active').length);
+    console.log('Policies loaded:', policies.length);
   } catch (err) {
     console.error('Failed to load policies:', err);
   }
@@ -371,15 +371,13 @@ async function loadPoliciesForEdit() {
         policySelect.remove(1);
       }
       
-      // 활성 정책만 추가
-      policies
-        .filter(p => p.status === 'active')
-        .forEach(policy => {
-          const option = document.createElement('option');
-          option.value = policy.id;
-          option.textContent = policy.policy_name;
-          policySelect.appendChild(option);
-        });
+      // 모든 정책 추가
+      policies.forEach(policy => {
+        const option = document.createElement('option');
+        option.value = policy.id;
+        option.textContent = policy.policy_name;
+        policySelect.appendChild(option);
+      });
     }
   } catch (error) {
     console.error('Failed to load policies:', error);

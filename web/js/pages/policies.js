@@ -23,7 +23,7 @@ export async function loadPolicies() {
       console.log('Loaded policies:', policies);
       
       if (policies.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">등록된 정책이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">등록된 정책이 없습니다.</td></tr>';
       } else {
         const html = policies.map(p => `
           <tr>
@@ -33,11 +33,6 @@ export async function loadPolicies() {
                 <summary style="color:#667eea;font-weight:600;">데이터 보기</summary>
                 <pre style="background:#f8f9fa;padding:12px;border-radius:8px;margin-top:8px;overflow-x:auto;font-size:12px;">${escapeHtml(JSON.stringify(JSON.parse(p.policy_data), null, 2))}</pre>
               </details>
-            </td>
-            <td>
-              <span class="status-badge ${p.status === 'active' ? 'active' : 'inactive'}">
-                ${p.status === 'active' ? '✅ 활성' : '❌ 비활성'}
-              </span>
             </td>
             <td style="font-size:13px;color:#6b7280;">
               생성: ${formatDateTime(p.created_at)}<br/>
@@ -71,12 +66,12 @@ export async function loadPolicies() {
         console.log('Policy table updated successfully');
       }
     } else {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center">불러오기에 실패했습니다: ${escapeHtml(body.message || '')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center">불러오기에 실패했습니다: ${escapeHtml(body.message || '')}</td></tr>`;
     }
   } catch (e) {
     console.error('Failed to load policies:', e);
     const tbody = document.getElementById('policies-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center">서버 오류</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="text-center">서버 오류</td></tr>';
   }
 }
 
@@ -159,7 +154,6 @@ function openEditPolicyModal(policyId) {
   document.getElementById('edit_policy_id').value = policy.id;
   document.getElementById('edit_policy_name').value = policy.policy_name;
   document.getElementById('edit_policy_data').value = JSON.stringify(JSON.parse(policy.policy_data), null, 2);
-  document.getElementById('edit_policy_status').value = policy.status;
 
   openModal(document.getElementById('edit-policy-modal'));
 }
@@ -169,7 +163,6 @@ export async function handleEditPolicy(e) {
   const policyId = document.getElementById('edit_policy_id').value;
   const policyName = document.getElementById('edit_policy_name').value.trim();
   const policyDataStr = document.getElementById('edit_policy_data').value.trim();
-  const status = document.getElementById('edit_policy_status').value;
 
   if (!policyName || !policyDataStr) {
     showAlert('모든 필드를 입력해주세요.');
@@ -202,8 +195,7 @@ export async function handleEditPolicy(e) {
       },
       body: JSON.stringify({
         policy_name: policyName,
-        policy_data: policyDataStr,
-        status: status
+        policy_data: policyDataStr
       }),
       _noGlobalLoading: true
     });

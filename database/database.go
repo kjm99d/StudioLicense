@@ -121,7 +121,6 @@ func createTables() error {
 			id VARCHAR(50) PRIMARY KEY,
 			policy_name VARCHAR(255) UNIQUE NOT NULL,
 			policy_data LONGTEXT NOT NULL,
-			status VARCHAR(50) NOT NULL DEFAULT 'active',
 			created_at VARCHAR(50) NOT NULL DEFAULT '',
 			updated_at VARCHAR(50) NOT NULL DEFAULT ''
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,

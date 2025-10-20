@@ -199,9 +199,6 @@ definitions:
         type: string
       policy_name:
         type: string
-      status:
-        description: active, inactive
-        type: string
       updated_at:
         type: string
     type: object
@@ -226,8 +223,6 @@ definitions:
       policy_data:
         type: string
       policy_name:
-        type: string
-      status:
         type: string
     type: object
   models.UpdateProductRequest:

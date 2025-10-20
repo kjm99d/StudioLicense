@@ -61,10 +61,10 @@ func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 
-	query := `INSERT INTO policies (id, policy_name, policy_data, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO policies (id, policy_name, policy_data, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?)`
 
-	_, err = database.DB.Exec(query, policyID, req.PolicyName, req.PolicyData, models.PolicyStatusActive, now, now)
+	_, err = database.DB.Exec(query, policyID, req.PolicyName, req.PolicyData, now, now)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to create policy", err))
@@ -76,7 +76,6 @@ func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 		ID:         policyID,
 		PolicyName: req.PolicyName,
 		PolicyData: req.PolicyData,
-		Status:     models.PolicyStatusActive,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -106,7 +105,7 @@ func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} models.APIResponse "서버 에러"
 // @Router /api/admin/policies [get]
 func GetAllPolicies(w http.ResponseWriter, r *http.Request) {
-	query := `SELECT id, policy_name, policy_data, status, created_at, updated_at
+	query := `SELECT id, policy_name, policy_data, created_at, updated_at
 		FROM policies ORDER BY created_at DESC`
 
 	rows, err := database.DB.Query(query)
@@ -122,7 +121,7 @@ func GetAllPolicies(w http.ResponseWriter, r *http.Request) {
 		var policy models.Policy
 		err := rows.Scan(
 			&policy.ID, &policy.PolicyName, &policy.PolicyData,
-			&policy.Status, &policy.CreatedAt, &policy.UpdatedAt,
+			&policy.CreatedAt, &policy.UpdatedAt,
 		)
 		if err != nil {
 			continue
@@ -154,12 +153,12 @@ func GetPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var policy models.Policy
-	query := `SELECT id, policy_name, policy_data, status, created_at, updated_at
+	query := `SELECT id, policy_name, policy_data, created_at, updated_at
 		FROM policies WHERE id = ?`
 
 	err := database.DB.QueryRow(query, policyID).Scan(
 		&policy.ID, &policy.PolicyName, &policy.PolicyData,
-		&policy.Status, &policy.CreatedAt, &policy.UpdatedAt,
+		&policy.CreatedAt, &policy.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -212,11 +211,11 @@ func UpdatePolicy(w http.ResponseWriter, r *http.Request) {
 
 	// 정책 존재 여부 확인
 	var policy models.Policy
-	query := `SELECT id, policy_name, policy_data, status, created_at, updated_at
+	query := `SELECT id, policy_name, policy_data, created_at, updated_at
 		FROM policies WHERE id = ?`
 	err := database.DB.QueryRow(query, policyID).Scan(
 		&policy.ID, &policy.PolicyName, &policy.PolicyData,
-		&policy.Status, &policy.CreatedAt, &policy.UpdatedAt,
+		&policy.CreatedAt, &policy.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
@@ -231,15 +230,12 @@ func UpdatePolicy(w http.ResponseWriter, r *http.Request) {
 	if req.PolicyData != "" {
 		policy.PolicyData = req.PolicyData
 	}
-	if req.Status != "" {
-		policy.Status = req.Status
-	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
 	policy.UpdatedAt = now
 
-	updateQuery := `UPDATE policies SET policy_name = ?, policy_data = ?, status = ?, updated_at = ? WHERE id = ?`
-	_, err = database.DB.Exec(updateQuery, policy.PolicyName, policy.PolicyData, policy.Status, now, policyID)
+	updateQuery := `UPDATE policies SET policy_name = ?, policy_data = ?, updated_at = ? WHERE id = ?`
+	_, err = database.DB.Exec(updateQuery, policy.PolicyName, policy.PolicyData, now, policyID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to update policy", err))

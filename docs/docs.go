@@ -1737,10 +1737,6 @@ const docTemplate = `{
                 "policy_name": {
                     "type": "string"
                 },
-                "status": {
-                    "description": "active, inactive",
-                    "type": "string"
-                },
                 "updated_at": {
                     "type": "string"
                 }
@@ -1777,9 +1773,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "policy_name": {
-                    "type": "string"
-                },
-                "status": {
                     "type": "string"
                 }
             }
