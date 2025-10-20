@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"studiolicense/database"
 	"studiolicense/logger"
 	"studiolicense/models"
@@ -420,6 +421,83 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to update license", err))
 		return
+	}
+
+	// 만료일 변경 시 상태 자동 조정
+	if req.ExpiresAt != "" {
+		now := time.Now().Format("2006-01-02 15:04:05")
+
+		// 현재 상태 확인
+		var currentStatus, licenseKey string
+		statusQuery := "SELECT status, license_key FROM licenses WHERE id = ?"
+		database.DB.QueryRow(statusQuery, id).Scan(&currentStatus, &licenseKey)
+
+		// 관리자 정보 가져오기
+		var adminID, username string
+		if adminIDRaw := r.Context().Value("admin_id"); adminIDRaw != nil {
+			adminID = adminIDRaw.(string)
+		}
+		if usernameRaw := r.Context().Value("username"); usernameRaw != nil {
+			username = usernameRaw.(string)
+		}
+
+		// 만료일이 미래이면서 만료 상태인 경우 -> 활성화
+		if expiresAtStr > now[:10] && currentStatus == models.LicenseStatusExpired {
+			updateStatusQuery := "UPDATE licenses SET status = ?, updated_at = ? WHERE id = ?"
+			database.DB.Exec(updateStatusQuery, models.LicenseStatusActive, now, id)
+
+			logger.WithFields(map[string]interface{}{
+				"license_id": id,
+				"old_status": currentStatus,
+				"new_status": models.LicenseStatusActive,
+				"expires_at": expiresAtStr,
+			}).Info("License auto-reactivated due to expiration date extension")
+
+			// 활동 로그 기록
+			details := fmt.Sprintf("라이선스 키: %s, 만료일 연장으로 자동 재활성화 (만료일: %s)", licenseKey, expiresAtStr)
+			utils.LogAdminActivity(adminID, username, "라이선스 재활성화", details)
+		}
+
+		// 만료일이 과거이면서 활성 상태인 경우 -> 만료 처리
+		if expiresAtStr < now[:10] && currentStatus == models.LicenseStatusActive {
+			updateStatusQuery := "UPDATE licenses SET status = ?, updated_at = ? WHERE id = ?"
+			database.DB.Exec(updateStatusQuery, models.LicenseStatusExpired, now, id)
+
+			logger.WithFields(map[string]interface{}{
+				"license_id": id,
+				"old_status": currentStatus,
+				"new_status": models.LicenseStatusExpired,
+				"expires_at": expiresAtStr,
+			}).Info("License auto-expired due to past expiration date")
+
+			// 활동 로그 기록
+			details := fmt.Sprintf("라이선스 키: %s, 과거 만료일 설정으로 자동 만료 처리 (만료일: %s)", licenseKey, expiresAtStr)
+			utils.LogAdminActivity(adminID, username, "라이선스 만료 처리", details)
+		}
+	}
+
+	// 라이선스 수정 활동 로그 기록
+	if adminIDRaw := r.Context().Value("admin_id"); adminIDRaw != nil {
+		adminID := adminIDRaw.(string)
+		username, _ := r.Context().Value("username").(string)
+
+		// 변경 내역을 상세히 기록
+		var changes []string
+		if req.ProductName != "" {
+			changes = append(changes, fmt.Sprintf("제품명: %s", req.ProductName))
+		}
+		if req.CustomerName != "" {
+			changes = append(changes, fmt.Sprintf("고객명: %s", req.CustomerName))
+		}
+		if req.MaxDevices > 0 {
+			changes = append(changes, fmt.Sprintf("최대 디바이스: %d", req.MaxDevices))
+		}
+		if req.ExpiresAt != "" {
+			changes = append(changes, fmt.Sprintf("만료일: %s", expiresAtStr))
+		}
+
+		details := fmt.Sprintf("라이선스 ID: %s, 변경사항: %s", id, strings.Join(changes, ", "))
+		utils.LogAdminActivity(adminID, username, "라이선스 수정", details)
 	}
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("License updated successfully", nil))
