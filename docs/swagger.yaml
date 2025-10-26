@@ -44,6 +44,40 @@ definitions:
       old_password:
         type: string
     type: object
+  models.ClientLogEntry:
+    properties:
+      app_version:
+        type: string
+      category:
+        description: APP, SYSTEM, LICENSE, NETWORK
+        type: string
+      details:
+        type: string
+      level:
+        description: DEBUG, INFO, WARN, ERROR, FATAL
+        type: string
+      message:
+        type: string
+      os_version:
+        type: string
+      stack_trace:
+        type: string
+      timestamp:
+        description: 클라이언트 시간
+        type: string
+    type: object
+  models.ClientLogRequest:
+    properties:
+      device_id:
+        type: string
+      license_key:
+        type: string
+      logs:
+        description: 배치 전송 지원
+        items:
+          $ref: '#/definitions/models.ClientLogEntry'
+        type: array
+    type: object
   models.CreateLicenseRequest:
     properties:
       customer_email:
@@ -293,6 +327,103 @@ paths:
       summary: 비밀번호 변경
       tags:
       - 인증
+  /api/admin/client-logs:
+    get:
+      consumes:
+      - application/json
+      description: 클라이언트가 전송한 로그를 조회합니다
+      parameters:
+      - description: 라이선스 키
+        in: query
+        name: license_key
+        type: string
+      - description: 디바이스 ID
+        in: query
+        name: device_id
+        type: string
+      - description: 로그 레벨 (DEBUG, INFO, WARN, ERROR, FATAL)
+        in: query
+        name: level
+        type: string
+      - description: 카테고리 (APP, SYSTEM, LICENSE, NETWORK, etc.)
+        in: query
+        name: category
+        type: string
+      - description: 시작 날짜 (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: 종료 날짜 (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: '페이지 번호 (기본값: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: '페이지 크기 (기본값: 50)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 로그 목록
+          schema:
+            $ref: '#/definitions/models.PaginatedResponse'
+        "401":
+          description: 인증 실패
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 클라이언트 로그 조회
+      tags:
+      - 관리자 - 로그
+  /api/admin/client-logs/cleanup:
+    delete:
+      consumes:
+      - application/json
+      description: 특정 기간 이전의 클라이언트 로그를 삭제합니다
+      parameters:
+      - description: 이전 날짜 (YYYY-MM-DD) - 이 날짜 이전의 로그 삭제
+        in: query
+        name: before_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 삭제 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: 인증 실패
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: 권한 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 클라이언트 로그 삭제
+      tags:
+      - 관리자 - 로그
   /api/admin/devices/cleanup:
     post:
       consumes:
@@ -1051,6 +1182,40 @@ paths:
       summary: 제품 수정
       tags:
       - 제품
+  /api/client/logs:
+    post:
+      consumes:
+      - application/json
+      description: 클라이언트 애플리케이션에서 발생한 로그를 서버로 전송합니다 (배치 전송 지원)
+      parameters:
+      - description: 로그 데이터
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ClientLogRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 로그 전송 성공
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 라이선스 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 클라이언트 로그 전송
+      tags:
+      - 클라이언트 - 로그
   /api/license/activate:
     post:
       consumes:

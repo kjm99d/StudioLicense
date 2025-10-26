@@ -57,9 +57,10 @@ func main() {
 	logger.Info("🚀 Studio License Server Starting")
 	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	// 데이터베이스 초기화 (기본값: SQLite ./license.db)
-	// MySQL 사용: database.Initialize("mysql", "user:password@tcp(localhost:3306)/studiolicense")
-	if err := database.Initialize("mysql", "root:root@tcp(localhost:3306)/studiolicense"); err != nil {
+	// 데이터베이스 초기화 (MySQL 전용)
+	// DSN 형식: "user:password@tcp(host:port)/dbname"
+	mysqlDSN := "root:root@tcp(localhost:3306)/studiolicense"
+	if err := database.Initialize(mysqlDSN); err != nil {
 		logger.Fatal("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
@@ -293,6 +294,36 @@ func main() {
 		middleware.ChainMiddleware(
 			handlers.ValidateLicense,
 			middleware.LoggingMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	// 클라이언트 로그 API (인증 불필요)
+	mux.HandleFunc("/api/client/logs",
+		middleware.ChainMiddleware(
+			handlers.SubmitClientLogs,
+			middleware.LoggingMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	// 관리자 - 클라이언트 로그 조회 API (인증 필요)
+	mux.HandleFunc("/api/admin/client-logs",
+		middleware.ChainMiddleware(
+			handlers.GetClientLogs,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	// 관리자 - 클라이언트 로그 삭제 API (슈퍼 관리자 전용)
+	mux.HandleFunc("/api/admin/client-logs/cleanup",
+		middleware.ChainMiddleware(
+			handlers.DeleteClientLogs,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.RequireRoles("super_admin"),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))

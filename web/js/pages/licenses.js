@@ -130,18 +130,30 @@ export async function handleCreateLicense(e) {
       e.target.reset();
       
       // alert 후에 데이터 로드
-      await showAlert(`라이선스가 생성되었습니다!\n라이선스 키: ${result.data.license_key}`, '라이선스 생성');
-      
-      // alert이 닫힌 후 데이터 새로고침
-      setTimeout(() => {
+      setTimeout(async () => {
+        await showAlert(`라이선스가 생성되었습니다!\n라이선스 키: ${result.data.license_key}`, '라이선스 생성 완료');
         loadLicenses();
         if (window.loadDashboardStats) window.loadDashboardStats();
-      }, 100);
+      }, 300);
     } else {
-      await showAlert('라이선스 생성 실패: ' + result.message, '라이선스 생성');
+      // 실패 시에도 모달 닫고 alert
+      const licenseModal = document.getElementById('license-modal');
+      if (licenseModal) closeModal(licenseModal);
+      e.target.reset();
+      
+      setTimeout(() => {
+        showAlert('라이선스 생성 실패: ' + result.message, '라이선스 생성 실패');
+      }, 300);
     }
   } catch (error) {
-    await showAlert('서버 오류가 발생했습니다.', '라이선스 생성');
+    // 에러 시에도 모달 닫고 alert
+    const licenseModal = document.getElementById('license-modal');
+    if (licenseModal) closeModal(licenseModal);
+    e.target.reset();
+    
+    setTimeout(() => {
+      showAlert('서버 오류가 발생했습니다.', '라이선스 생성 실패');
+    }, 300);
     console.error('Failed to create license:', error);
   } finally {
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
@@ -428,16 +440,30 @@ export async function handleEditLicense(e) {
     const data = await response.json();
     
     if (response.ok && data.status === 'success') {
-      await showAlert('라이선스가 수정되었습니다.', 'success');
-      closeModal(document.getElementById('edit-license-modal'));
-      loadLicenses();
-      if (window.loadDashboardStats) window.loadDashboardStats();
+      const modal = document.getElementById('edit-license-modal');
+      if (modal) closeModal(modal);
+      
+      setTimeout(async () => {
+        await showAlert('라이선스가 수정되었습니다.', '라이선스 수정 완료');
+        loadLicenses();
+        if (window.loadDashboardStats) window.loadDashboardStats();
+      }, 300);
     } else {
-      await showAlert('수정 실패: ' + (data.message || '알 수 없는 오류'), 'error');
+      const modal = document.getElementById('edit-license-modal');
+      if (modal) closeModal(modal);
+      
+      setTimeout(() => {
+        showAlert('수정 실패: ' + (data.message || '알 수 없는 오류'), '라이선스 수정 실패');
+      }, 300);
     }
   } catch (error) {
     console.error('Failed to update license:', error);
-    await showAlert('서버 오류가 발생했습니다.', 'error');
+    const modal = document.getElementById('edit-license-modal');
+    if (modal) closeModal(modal);
+    
+    setTimeout(() => {
+      showAlert('서버 오류가 발생했습니다.', '라이선스 수정 실패');
+    }, 300);
   } finally {
     if (submitBtn) {
       submitBtn.disabled = originalBtnDisabled;

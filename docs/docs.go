@@ -80,6 +80,157 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/client-logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "클라이언트가 전송한 로그를 조회합니다",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 로그"
+                ],
+                "summary": "클라이언트 로그 조회",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "라이선스 키",
+                        "name": "license_key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "디바이스 ID",
+                        "name": "device_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "로그 레벨 (DEBUG, INFO, WARN, ERROR, FATAL)",
+                        "name": "level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "카테고리 (APP, SYSTEM, LICENSE, NETWORK, etc.)",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "시작 날짜 (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "종료 날짜 (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "페이지 번호 (기본값: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "페이지 크기 (기본값: 50)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "로그 목록",
+                        "schema": {
+                            "$ref": "#/definitions/models.PaginatedResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "인증 실패",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/client-logs/cleanup": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "특정 기간 이전의 클라이언트 로그를 삭제합니다",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 로그"
+                ],
+                "summary": "클라이언트 로그 삭제",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "이전 날짜 (YYYY-MM-DD) - 이 날짜 이전의 로그 삭제",
+                        "name": "before_date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "삭제 성공",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "잘못된 요청",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "인증 실패",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/devices/cleanup": {
             "post": {
                 "security": [
@@ -1317,6 +1468,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/client/logs": {
+            "post": {
+                "description": "클라이언트 애플리케이션에서 발생한 로그를 서버로 전송합니다 (배치 전송 지원)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "클라이언트 - 로그"
+                ],
+                "summary": "클라이언트 로그 전송",
+                "parameters": [
+                    {
+                        "description": "로그 데이터",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ClientLogRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "로그 전송 성공",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "잘못된 요청",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "라이선스 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/license/activate": {
             "post": {
                 "description": "라이선스 키를 사용하여 디바이스를 활성화합니다",
@@ -1504,6 +1707,56 @@ const docTemplate = `{
                 },
                 "old_password": {
                     "type": "string"
+                }
+            }
+        },
+        "models.ClientLogEntry": {
+            "type": "object",
+            "properties": {
+                "app_version": {
+                    "type": "string"
+                },
+                "category": {
+                    "description": "APP, SYSTEM, LICENSE, NETWORK",
+                    "type": "string"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "level": {
+                    "description": "DEBUG, INFO, WARN, ERROR, FATAL",
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "os_version": {
+                    "type": "string"
+                },
+                "stack_trace": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "클라이언트 시간",
+                    "type": "string"
+                }
+            }
+        },
+        "models.ClientLogRequest": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string"
+                },
+                "license_key": {
+                    "type": "string"
+                },
+                "logs": {
+                    "description": "배치 전송 지원",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ClientLogEntry"
+                    }
                 }
             }
         },

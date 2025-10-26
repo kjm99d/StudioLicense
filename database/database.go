@@ -6,32 +6,21 @@ import (
 	"studiolicense/logger"
 
 	_ "github.com/go-sql-driver/mysql"
-	_ "modernc.org/sqlite"
 )
 
 var DB *sql.DB
-var dbType string // 데이터베이스 타입 저장
 
-// Initialize 데이터베이스 초기화
-// dbType: "sqlite" 또는 "mysql"
-// dbPath: SQLite 파일 경로 또는 MySQL DSN
-func Initialize(t, dbPath string) error {
+// Initialize 데이터베이스 초기화 (MySQL 전용)
+// dsn: MySQL DSN 문자열 (예: "user:password@tcp(localhost:3306)/dbname")
+func Initialize(dsn string) error {
 	var err error
 
-	// 기본값 설정
-	if t == "" {
-		t = "sqlite"
-	}
-	if dbPath == "" {
-		if t == "sqlite" {
-			dbPath = "./license.db"
-		}
+	// DSN이 없으면 에러
+	if dsn == "" {
+		return fmt.Errorf("MySQL DSN is required")
 	}
 
-	// 전역 dbType 저장
-	dbType = t
-
-	DB, err = sql.Open(dbType, dbPath)
+	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
@@ -39,13 +28,6 @@ func Initialize(t, dbPath string) error {
 	// 연결 테스트
 	if err := DB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	// SQLite 전용: 외래키 강제 활성화 (기본값 off)
-	if dbType == "sqlite" {
-		if _, err := DB.Exec("PRAGMA foreign_keys = ON"); err != nil {
-			return fmt.Errorf("failed to enable foreign keys: %w", err)
-		}
 	}
 
 	// 테이블 생성
@@ -94,7 +76,8 @@ func createTables() error {
 			description TEXT,
 			status VARCHAR(50) NOT NULL DEFAULT 'active',
 			created_at VARCHAR(50) NOT NULL DEFAULT '',
-			updated_at VARCHAR(50) NOT NULL DEFAULT ''
+			updated_at VARCHAR(50) NOT NULL DEFAULT '',
+			INDEX idx_products_status (status)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 라이선스 테이블
@@ -113,7 +96,11 @@ func createTables() error {
 			created_at VARCHAR(50) NOT NULL DEFAULT '',
 			updated_at VARCHAR(50) NOT NULL DEFAULT '',
 			FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-			FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE SET NULL
+			FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE SET NULL,
+			INDEX idx_licenses_key (license_key),
+			INDEX idx_licenses_product (product_id),
+			INDEX idx_licenses_status (status),
+			INDEX idx_licenses_expires (expires_at)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 정책 테이블
@@ -137,7 +124,10 @@ func createTables() error {
 			last_validated_at VARCHAR(50) NOT NULL DEFAULT '',
 			deactivated_at VARCHAR(50),
 			FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE,
-			UNIQUE KEY unique_device (license_id, device_fingerprint)
+			UNIQUE KEY unique_device (license_id, device_fingerprint),
+			INDEX idx_devices_license (license_id),
+			INDEX idx_devices_fingerprint (device_fingerprint),
+			INDEX idx_devices_status (status)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 디바이스 활동 로그 테이블
@@ -167,44 +157,38 @@ func createTables() error {
 			INDEX idx_created (created_at)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
-		// 인덱스 생성
-		`CREATE INDEX IF NOT EXISTS idx_products_status ON products(status)`,
-		`CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key)`,
-		`CREATE INDEX IF NOT EXISTS idx_licenses_product ON licenses(product_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status)`,
-		`CREATE INDEX IF NOT EXISTS idx_licenses_expires ON licenses(expires_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_policies_product ON policies(product_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_policies_status ON policies(status)`,
-		`CREATE INDEX IF NOT EXISTS idx_devices_license ON device_activations(license_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_devices_fingerprint ON device_activations(device_fingerprint)`,
-		`CREATE INDEX IF NOT EXISTS idx_devices_status ON device_activations(status)`,
+		// 클라이언트 로그 테이블
+		`CREATE TABLE IF NOT EXISTS client_logs (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			license_key VARCHAR(255) NOT NULL,
+			device_id VARCHAR(50),
+			level VARCHAR(20) NOT NULL,
+			category VARCHAR(50) NOT NULL,
+			message TEXT NOT NULL,
+			details LONGTEXT,
+			stack_trace LONGTEXT,
+		app_version VARCHAR(50),
+		os_version VARCHAR(100),
+		client_ip VARCHAR(50),
+		client_timestamp VARCHAR(50),
+		created_at VARCHAR(50) NOT NULL DEFAULT '',
+		INDEX idx_license_key (license_key),
+		INDEX idx_device_id (device_id),
+		INDEX idx_level (level),
+		INDEX idx_category (category),
+		INDEX idx_created (created_at)
+	) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 	}
 
-	// 데이터베이스별 처리
-	if dbType == "sqlite" {
-		// SQLite: PRAGMA 추가
-		sqliteTables := []string{
-			`PRAGMA foreign_keys = OFF`,
-		}
-		sqliteTables = append(sqliteTables, baseTables...)
-		sqliteTables = append(sqliteTables, `PRAGMA foreign_keys = ON`)
-
-		for _, sql := range sqliteTables {
-			if _, err := DB.Exec(sql); err != nil {
-				// SQLite에서 지원하지 않는 문법 무시
-				if !contains(err.Error(), "syntax error") {
-					return fmt.Errorf("failed to execute SQL: %w", err)
-				}
-			}
-		}
-	} else {
-		// MySQL: 일반 실행
-		for _, sql := range baseTables {
-			if _, err := DB.Exec(sql); err != nil {
-				// 이미 존재하는 인덱스/테이블 오류 무시
-				if !contains(err.Error(), "already exists") {
-					return fmt.Errorf("failed to execute SQL: %w", err)
-				}
+	// MySQL 테이블 생성
+	for _, sql := range baseTables {
+		if _, err := DB.Exec(sql); err != nil {
+			// 이미 존재하는 인덱스/테이블 오류, 존재하지 않는 컬럼 오류 무시
+			if !contains(err.Error(), "already exists") && 
+			   !contains(err.Error(), "Duplicate key name") && 
+			   !contains(err.Error(), "Duplicate") &&
+			   !contains(err.Error(), "doesn't exist in table") {
+				logger.Warn("SQL execution warning: %v", err)
 			}
 		}
 	}
@@ -214,7 +198,15 @@ func createTables() error {
 
 // contains 문자열 포함 여부 확인
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && len(s) >= len(substr) && (s == substr || len(substr) == 0 || (len(s) > 0 && s[0:len(substr)] == substr || len(s) > len(substr)))
+	if len(s) == 0 || len(substr) == 0 {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // createDefaultAdmin 기본 관리자 계정 생성

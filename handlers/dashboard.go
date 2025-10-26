@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -47,17 +46,17 @@ func GetRecentActivities(w http.ResponseWriter, r *http.Request) {
 
 	// 기본 쿼리 구성 (MySQL/SQLite 모두 호환)
 	baseDevice := `SELECT 'device' AS type, al.action, al.details, al.created_at AS created_at,
-			   al.id AS sort_id,
+			   CAST(al.id AS CHAR) AS sort_id,
 			   l.license_key, l.customer_name, l.product_name,
 			   d.device_name, d.device_fingerprint,
-			   NULL AS admin_username
+			   '' AS admin_username
 		FROM device_activity_logs al
 		JOIN device_activations d ON al.device_id = d.id
 		JOIN licenses l ON al.license_id = l.id`
 	baseAdmin := `SELECT 'admin' AS type, a.action, a.details, a.created_at AS created_at,
-			   a.id AS sort_id,
-			   NULL AS license_key, NULL AS customer_name, NULL AS product_name,
-			   NULL AS device_name, NULL AS device_fingerprint,
+			   CAST(a.id AS CHAR) AS sort_id,
+			   '' AS license_key, '' AS customer_name, '' AS product_name,
+			   '' AS device_name, '' AS device_fingerprint,
 			   a.username AS admin_username
 		FROM admin_activity_logs a`
 
@@ -95,18 +94,17 @@ func GetRecentActivities(w http.ResponseWriter, r *http.Request) {
 	rows, err := database.DB.Query(query, args...)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query activities", err))
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query activities: "+err.Error(), nil))
 		return
 	}
 	defer rows.Close()
 
 	activities := []map[string]interface{}{}
 	for rows.Next() {
-		var typ, action, details, createdAt string
-		var sortId int64
-		var licenseKey, customerName, productName sql.NullString
-		var deviceName, deviceFingerprint sql.NullString
-		var adminUsername sql.NullString
+		var typ, action, details, createdAt, sortId string
+		var licenseKey, customerName, productName string
+		var deviceName, deviceFingerprint string
+		var adminUsername string
 
 		if err := rows.Scan(&typ, &action, &details, &createdAt, &sortId, &licenseKey, &customerName, &productName, &deviceName, &deviceFingerprint, &adminUsername); err != nil {
 			continue
@@ -118,23 +116,23 @@ func GetRecentActivities(w http.ResponseWriter, r *http.Request) {
 			"details":    details,
 			"created_at": createdAt,
 		}
-		if licenseKey.Valid {
-			item["license_key"] = licenseKey.String
+		if licenseKey != "" {
+			item["license_key"] = licenseKey
 		}
-		if customerName.Valid {
-			item["customer_name"] = customerName.String
+		if customerName != "" {
+			item["customer_name"] = customerName
 		}
-		if productName.Valid {
-			item["product_name"] = productName.String
+		if productName != "" {
+			item["product_name"] = productName
 		}
-		if deviceName.Valid {
-			item["device_name"] = deviceName.String
+		if deviceName != "" {
+			item["device_name"] = deviceName
 		}
-		if deviceFingerprint.Valid {
-			item["fingerprint"] = deviceFingerprint.String
+		if deviceFingerprint != "" {
+			item["fingerprint"] = deviceFingerprint
 		}
-		if adminUsername.Valid {
-			item["admin_username"] = adminUsername.String
+		if adminUsername != "" {
+			item["admin_username"] = adminUsername
 		}
 		activities = append(activities, item)
 	}

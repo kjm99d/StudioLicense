@@ -125,16 +125,33 @@ export async function handleCreatePolicy(e) {
     
     if (res.ok && body.status === 'success') {
       await loadPolicies();
-      closeModal(document.getElementById('create-policy-modal'));
-      showAlert('정책이 생성되었습니다.', 'success');
-      
+      const modal = document.getElementById('create-policy-modal');
+      if (modal) closeModal(modal);
       e.target.reset();
+      
+      setTimeout(() => {
+        showAlert('정책이 생성되었습니다.', '정책 생성 완료');
+      }, 300);
     } else {
-      showAlert(body.message || '정책 생성에 실패했습니다.', 'error');
+      // 실패 시에도 모달 닫고 alert
+      const modal = document.getElementById('create-policy-modal');
+      if (modal) closeModal(modal);
+      e.target.reset();
+      
+      setTimeout(() => {
+        showAlert(body.message || '정책 생성에 실패했습니다.', '정책 생성 실패');
+      }, 300);
     }
   } catch (err) {
     console.error('Failed to create policy:', err);
-    showAlert('서버 오류가 발생했습니다.', 'error');
+    // 에러 시에도 모달 닫고 alert
+    const modal = document.getElementById('create-policy-modal');
+    if (modal) closeModal(modal);
+    e.target.reset();
+    
+    setTimeout(() => {
+      showAlert('서버 오류가 발생했습니다.', '정책 생성 실패');
+    }, 300);
   } finally {
     if (submitBtn) {
       submitBtn.disabled = originalBtnDisabled;
@@ -203,14 +220,30 @@ export async function handleEditPolicy(e) {
     
     if (res.ok && body.status === 'success') {
       await loadPolicies();
-      closeModal(document.getElementById('edit-policy-modal'));
-      showAlert('정책이 수정되었습니다.', 'success');
+      const modal = document.getElementById('edit-policy-modal');
+      if (modal) closeModal(modal);
+      
+      setTimeout(() => {
+        showAlert('정책이 수정되었습니다.', '정책 수정 완료');
+      }, 300);
     } else {
-      showAlert(body.message || '정책 수정에 실패했습니다.', 'error');
+      // 실패 시에도 모달 닫고 alert
+      const modal = document.getElementById('edit-policy-modal');
+      if (modal) closeModal(modal);
+      
+      setTimeout(() => {
+        showAlert(body.message || '정책 수정에 실패했습니다.', '정책 수정 실패');
+      }, 300);
     }
   } catch (err) {
     console.error('Failed to update policy:', err);
-    showAlert('서버 오류가 발생했습니다.', 'error');
+    // 에러 시에도 모달 닫고 alert
+    const modal = document.getElementById('edit-policy-modal');
+    if (modal) closeModal(modal);
+    
+    setTimeout(() => {
+      showAlert('서버 오류가 발생했습니다.', '정책 수정 실패');
+    }, 300);
   } finally {
     if (submitBtn) {
       submitBtn.disabled = originalBtnDisabled;

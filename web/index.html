@@ -227,6 +227,7 @@
                 <a href="#" data-page="licenses" class="nav-link">라이선스</a>
                 <a href="#" data-page="products" class="nav-link">제품</a>
                 <a href="#" data-page="policies" class="nav-link">정책</a>
+                <a href="#" data-page="client-logs" class="nav-link">클라이언트 로그</a>
                 <a href="#" data-page="admins" class="nav-link" id="admins-tab" style="display:none;">관리자</a>
                 <a href="#" data-page="swagger" class="nav-link">API 문서</a>
             </div>
@@ -421,6 +422,82 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- 클라이언트 로그 컨텐츠 -->
+            <div id="client-logs-content" class="content">
+                <div class="page-header">
+                    <h2>📋 클라이언트 로그</h2>
+                    <button class="btn red" onclick="openCleanupLogsModal()" style="margin-left: auto;">
+                        <i class="material-icons left">delete_sweep</i>로그 정리
+                    </button>
+                </div>
+
+                <!-- 필터 영역 -->
+                <div class="filter-box" style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s12 m3">
+                            <label>라이선스 키</label>
+                            <input type="text" id="filter-license-key" placeholder="전체">
+                        </div>
+                        <div class="col s12 m2">
+                            <label>디바이스 ID</label>
+                            <input type="text" id="filter-device-id" placeholder="전체">
+                        </div>
+                        <div class="col s12 m2">
+                            <label>로그 레벨</label>
+                            <select id="filter-level" class="browser-default">
+                                <option value="">전체</option>
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARN">WARN</option>
+                                <option value="ERROR">ERROR</option>
+                                <option value="FATAL">FATAL</option>
+                            </select>
+                        </div>
+                        <div class="col s12 m2">
+                            <label>카테고리</label>
+                            <select id="filter-category" class="browser-default">
+                                <option value="">전체</option>
+                                <option value="APP">APP</option>
+                                <option value="SYSTEM">SYSTEM</option>
+                                <option value="LICENSE">LICENSE</option>
+                                <option value="NETWORK">NETWORK</option>
+                                <option value="PLUGIN">PLUGIN</option>
+                                <option value="OTHER">OTHER</option>
+                            </select>
+                        </div>
+                        <div class="col s12 m3">
+                            <label>&nbsp;</label>
+                            <button class="btn blue" onclick="applyClientLogsFilter()" style="width: 100%;">
+                                <i class="material-icons left">search</i>검색
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>레벨</th>
+                                <th>카테고리</th>
+                                <th>라이선스 키</th>
+                                <th>디바이스 ID</th>
+                                <th>메시지</th>
+                                <th>상세</th>
+                            </tr>
+                        </thead>
+                        <tbody id="client-logs-tbody">
+                            <tr>
+                                <td colspan="7" class="loading">로딩 중...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="logs-pagination" class="pagination"></div>
             </div>
 
             <!-- Swagger 컨텐츠 -->
@@ -749,6 +826,54 @@
                 <div class="modal-footer">
                     <button type="button" class="btn grey darken-1 modal-close">취소</button>
                     <button type="submit" class="btn blue">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 클라이언트 로그 상세 모달 -->
+    <div id="log-detail-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📋 로그 상세</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="log-detail-content" class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <!-- JavaScript로 채움 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn grey darken-1 modal-close">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 클라이언트 로그 정리 모달 -->
+    <div id="cleanup-logs-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🗑️ 로그 정리</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="cleanup-logs-form">
+                <div class="modal-body">
+                    <p style="margin-bottom: 20px;">선택한 날짜 이전의 모든 클라이언트 로그를 삭제합니다.</p>
+                    <div class="form-group">
+                        <label for="cleanup_before_date">이전 날짜 *</label>
+                        <input type="date" id="cleanup_before_date" name="before_date" required>
+                        <small style="color: #6b7280;">이 날짜 이전의 로그가 삭제됩니다.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn red">삭제</button>
                 </div>
             </form>
         </div>

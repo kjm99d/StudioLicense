@@ -149,17 +149,37 @@ async function handleChangePassword(e) {
         });
 
         const result = await response.json();
+        
+        // 먼저 모달 닫기
+        const modal = document.getElementById('change-password-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        e.target.reset();
+        
         if (response.ok && result.status === 'success') {
-            await showAlert('비밀번호가 변경되었습니다. 다시 로그인 해주세요.', '비밀번호 변경');
-            // 보안을 위해 토큰 초기화 및 로그아웃
-            handleLogout();
-            document.getElementById('change-password-modal').classList.remove('active');
+            setTimeout(async () => {
+                await showAlert('비밀번호가 변경되었습니다. 다시 로그인 해주세요.', '비밀번호 변경 완료');
+                // 보안을 위해 토큰 초기화 및 로그아웃
+                handleLogout();
+            }, 300);
         } else {
-            await showAlert(result.message || '비밀번호 변경에 실패했습니다.', '비밀번호 변경');
+            setTimeout(() => {
+                showAlert(result.message || '비밀번호 변경에 실패했습니다.', '비밀번호 변경 실패');
+            }, 300);
         }
     } catch (error) {
         console.error('Failed to change password:', error);
-        await showAlert('서버 오류가 발생했습니다.', '비밀번호 변경');
+        // 에러 시에도 모달 닫기
+        const modal = document.getElementById('change-password-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        e.target.reset();
+        
+        setTimeout(() => {
+            showAlert('서버 오류가 발생했습니다.', '비밀번호 변경 실패');
+        }, 300);
     }
 }
 

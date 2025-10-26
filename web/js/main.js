@@ -4,6 +4,10 @@ window.handleLoginForm = async function(event) {
     
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
+    const errorEl = document.getElementById('login-error');
+    
+    // 에러 메시지 초기화
+    if (errorEl) errorEl.textContent = '';
     
     try {
         const response = await fetch('/api/admin/login', {
@@ -18,21 +22,20 @@ window.handleLoginForm = async function(event) {
             // 응답에서 토큰 추출
             const token = data.data?.token || data.token;
             if (!token) {
-                alert('토큰을 받지 못했습니다: ' + JSON.stringify(data));
+                if (errorEl) errorEl.textContent = '토큰을 받지 못했습니다.';
+                console.error('Token not received:', data);
                 return;
             }
             
             localStorage.setItem('token', token);
-            alert('로그인 성공!');
+            // 로그인 성공 시 바로 대시보드로 이동
             window.location.href = '/web/?page=dashboard';
         } else {
             const errorMsg = data.message || data.error || '알 수 없는 오류';
-            document.getElementById('login-error').textContent = '로그인 실패: ' + errorMsg;
-            alert('로그인 실패: ' + errorMsg);
+            if (errorEl) errorEl.textContent = '로그인 실패: ' + errorMsg;
         }
     } catch (error) {
-        alert('로그인 오류: ' + error.message);
-        document.getElementById('login-error').textContent = '오류: ' + error.message;
+        if (errorEl) errorEl.textContent = '오류: ' + error.message;
         console.error('Login error:', error);
     }
 };
@@ -47,6 +50,7 @@ import { loadAdmins, handleCreateAdmin } from './pages/admins.js';
 import { loadDashboardStats, loadRecentActivities } from './pages/dashboard.js';
 import { loadPolicies, openCreatePolicyModal, handleCreatePolicy, handleEditPolicy } from './pages/policies.js'; // 정책 관리 페이지
 import { loadProducts, showProductModal, initProductsPage } from './pages/products.js'; // 제품 관리 페이지
+import { initClientLogsPage } from './pages/client-logs.js'; // 클라이언트 로그 페이지
 
 // Expose helpers globally for legacy scripts (products.js, device rendering still in app.js)
 window.apiFetch = apiFetch;
@@ -232,14 +236,16 @@ function switchContent(page) {
     loadRecentActivities();
   } else if (page === 'licenses') {
     loadLicenses();
-  } else if (page === 'products') {
-    initProductsPage();
-  } else if (page === 'policies') {
-    loadPolicies();
   } else if (page === 'admins') {
     loadAdmins();
+  } else if (page === 'policies') {
+    loadPolicies();
+  } else if (page === 'products') {
+    initProductsPage();
+  } else if (page === 'client-logs') {
+    initClientLogsPage();
   } else if (page === 'swagger') {
-    // Swagger는 iframe으로 로드됨
+    // Swagger 페이지는 iframe으로 로드
   }
 }
 

@@ -112,23 +112,46 @@ export async function handleCreateAdmin(e) {
         showAlert('서브 관리자가 생성되었습니다.', '관리자 생성');
       }, 300);
     } else {
-      // 실패 시 버튼 상태 복구 후 alert
+      // 실패 시: 먼저 모달 닫기, 그 다음 alert 표시
+      const createAdminModal = document.getElementById('create-admin-modal');
+      if (createAdminModal) {
+        closeModal(createAdminModal);
+      }
+      e.target.reset();
+      
+      // 버튼 상태 복구
       if (submitBtn) { 
         submitBtn.disabled = originalBtnDisabled; 
         submitBtn.textContent = originalBtnText; 
       }
-      await showAlert(body.message || '생성에 실패했습니다.', '관리자 생성 실패');
-      return; // 여기서 반환해서 finally에서 중복 복구 방지
+      
+      // 모달 닫은 후 alert 보이기
+      setTimeout(() => {
+        showAlert(body.message || '생성에 실패했습니다.', '관리자 생성 실패');
+      }, 300);
+      return;
     }
   } catch (err) {
     console.error('Failed to create admin:', err);
-    // 에러 시 버튼 상태 복구 후 alert
+    
+    // 에러 시: 먼저 모달 닫기, 그 다음 alert 표시
+    const createAdminModal = document.getElementById('create-admin-modal');
+    if (createAdminModal) {
+      closeModal(createAdminModal);
+    }
+    e.target.reset();
+    
+    // 버튼 상태 복구
     if (submitBtn) { 
       submitBtn.disabled = originalBtnDisabled; 
       submitBtn.textContent = originalBtnText; 
     }
-    await showAlert('서버 오류가 발생했습니다.', '관리자 생성 실패');
-    return; // 여기서 반환해서 finally에서 중복 복구 방지
+    
+    // 모달 닫은 후 alert 보이기
+    setTimeout(() => {
+      showAlert('서버 오류가 발생했습니다.', '관리자 생성 실패');
+    }, 300);
+    return;
   }
 }
 

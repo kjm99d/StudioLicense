@@ -87,20 +87,36 @@ window.handleCreateProduct = async function handleCreateProduct(e) {
             const error = await response.json();
             // 409 Conflict: 제품명 중복
             if (response.status === 409) {
-                await showAlert('이미 존재하는 제품명입니다. 다른 이름을 사용해주세요.', '제품 생성');
+                const modal = document.getElementById('product-modal');
+                if (modal) modal.classList.remove('active');
+                e.target.reset();
+                
+                setTimeout(() => {
+                    showAlert('이미 존재하는 제품명입니다. 다른 이름을 사용해주세요.', '제품 생성 실패');
+                }, 300);
                 return;
             }
             throw new Error(error.message || 'Failed to create product');
         }
 
-    const result = await response.json();
-    await showAlert('제품이 생성되었습니다!', '제품 생성');
+        const result = await response.json();
+        const modal = document.getElementById('product-modal');
+        if (modal) modal.classList.remove('active');
+        e.target.reset();
         
-        document.getElementById('product-modal').classList.remove('active');
-        loadProducts();
+        setTimeout(async () => {
+            await showAlert('제품이 생성되었습니다!', '제품 생성 완료');
+            loadProducts();
+        }, 300);
     } catch (error) {
-    console.error('Error creating product:', error);
-    await showAlert('제품 생성 실패: ' + error.message, '제품 생성');
+        console.error('Error creating product:', error);
+        const modal = document.getElementById('product-modal');
+        if (modal) modal.classList.remove('active');
+        e.target.reset();
+        
+        setTimeout(() => {
+            showAlert('제품 생성 실패: ' + error.message, '제품 생성 실패');
+        }, 300);
     }
 }
 
