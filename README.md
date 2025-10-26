@@ -1,4 +1,4 @@
-﻿# Studio License Server
+# Studio License Server
 
 디바이스 하드웨어 기반 라이선스 관리 서버입니다.
 
@@ -13,7 +13,7 @@
 ### 🎫 라이선스 관리
 - 라이선스 생성, 조회, 수정, 삭제
 - 제품별 라이선스 발급
-- **정책 기반 라이선스 제어** (신규)
+- **정책 기반 라이선스 제어**
 - 라이선스 상태 관리 (활성/만료/폐기)
 - 최대 디바이스 수 제한
 - 만료일 관리
@@ -43,25 +43,22 @@
 - 실시간 통계 (라이선스, 디바이스)
 - 관리자 활동 로그
 - 디바이스 활동 로그
+- **클라이언트 로그 시스템** (신규)
+  - 클라이언트 애플리케이션 로그 수집
+  - 로그 레벨별 필터링 (DEBUG, INFO, WARN, ERROR, FATAL)
+  - 카테고리별 분류
+  - 스택 트레이스 기록
+  - 날짜 기반 로그 정리 기능
 - 필터링 및 검색 기능
 
 ## 요구사항
 
 - Go 1.21 이상
-- SQLite (기본) 또는 MySQL 8.0 이상
+- MySQL 8.0 이상
 
 ## 데이터베이스 셋업
 
-### SQLite (기본값)
-
-별도 설정 없이 바로 실행 가능합니다. `studiolicense.db` 파일이 자동으로 생성됩니다.
-
-```go
-// main.go (기본값)
-database.Initialize("sqlite", "./studiolicense.db")
-```
-
-### MySQL 사용 시
+### MySQL 설정
 
 ```bash
 # MySQL에서 데이터베이스 생성
@@ -69,8 +66,8 @@ mysql -u root -p -e "CREATE DATABASE studiolicense CHARACTER SET utf8mb4 COLLATE
 ```
 
 ```go
-// main.go에서 MySQL로 변경
-database.Initialize("mysql", "root:root@tcp(localhost:3306)/studiolicense")
+// main.go (기본 설정)
+database.Initialize("root:root@tcp(localhost:3306)/studiolicense")
 ```
 
 ### 자동 테이블 생성
@@ -79,11 +76,12 @@ Go 서버를 실행하면 다음 테이블들이 **자동으로 생성**됩니�
 
 - **admins** - 관리자 계정 (ID, 비밀번호, 역할)
 - **products** - 제품 정보
-- **policies** - 정책 정보 (신규)
+- **policies** - 정책 정보
 - **licenses** - 라이선스 키 및 활성화 정보 (정책 ID 포함)
 - **device_activations** - 디바이스별 활성화 기록
 - **admin_activity_logs** - 관리자 작업 로그
 - **device_activity_logs** - 디바이스 접근 로그
+- **client_logs** - 클라이언트 애플리케이션 로그 (신규)
 
 > **별도의 마이그레이션 작업은 필요 없습니다.** 데이터베이스만 생성하면 나머지는 모두 자동으로 처리됩니다.
 
@@ -250,7 +248,7 @@ SHA256(client_id|cpu_id|motherboard_sn|mac_address|disk_serial|machine_id)
 - `DELETE /api/admin/licenses?id={id}` - 라이선스 삭제
 - `GET /api/admin/licenses/devices?id={id}` - 라이선스 디바이스 목록
 
-### 정책 관리 API (신규)
+### 정책 관리 API
 - `GET /api/admin/policies` - 정책 목록
 - `GET /api/admin/policies/:id` - 정책 상세
 - `POST /api/admin/policies` - 정책 생성
@@ -272,6 +270,11 @@ SHA256(client_id|cpu_id|motherboard_sn|mac_address|disk_serial|machine_id)
 ### 대시보드 API
 - `GET /api/admin/dashboard/stats` - 통계 조회
 - `GET /api/admin/dashboard/activities` - 활동 로그 조회
+
+### 클라이언트 로그 API
+- `POST /api/client/logs` - 클라이언트 로그 전송 (인증 불필요)
+- `GET /api/admin/client-logs` - 로그 조회 (페이징, 필터링)
+- `DELETE /api/admin/client-logs/cleanup` - 날짜 기반 로그 정리
 
 ### 클라이언트 API (인증 불필요)
 - `POST /api/license/activate` - 라이선스 활성화
@@ -297,16 +300,14 @@ StudioLicense/
 │   ├── device_log.go          # 디바이스 활동 로그
 │   ├── license.go             # 라이선스 모델
 │   ├── product.go             # 제품 모델
-│   ├── policy.go              # 정책 모델 (신규)
 │   └── response.go            # API 응답 구조
 │
 ├── handlers/                  # API 핸들러
 │   ├── admin_device.go        # 디바이스 관리
 │   ├── admin_license.go       # 라이선스 관리
-│   ├── admin_policy.go        # 정책 관리 (신규)
 │   ├── admin_user.go          # Sub Admin 관리
 │   ├── auth.go                # 인증
-│   ├── client_license.go      # 클라이언트 API
+│   ├── client_license.go      # 클라이언트 라이선스 API
 │   ├── dashboard.go           # 대시보드
 │   └── product.go             # 제품 관리
 │
@@ -341,9 +342,10 @@ StudioLicense/
 │       ├── legacy-bridge.js   # 레거시 코드 브릿지
 │       └── pages/
 │           ├── admins.js      # 관리자 페이지
+│           ├── client-logs.js # 클라이언트 로그 페이지 (신규)
 │           ├── dashboard.js   # 대시보드 페이지
 │           ├── licenses.js    # 라이선스 페이지
-│           ├── policies.js    # 정책 페이지 (신규)
+│           ├── policies.js    # 정책 페이지
 │           └── products.js    # 제품 페이지
 │
 ├── docs/                      # Swagger API 문서
@@ -352,7 +354,6 @@ StudioLicense/
 │   └── swagger.yaml
 │
 ├── logs/                      # 로그 파일 (자동 생성)
-├── studiolicense.db           # SQLite DB (자동 생성)
 ├── API_TESTS.md               # API 테스트 가이드
 └── README.md                  # 이 파일
 ```
@@ -376,6 +377,54 @@ StudioLicense/
 - ✅ 로그인 시도 기록
 
 ## 최근 업데이트
+
+### v2.3.0 - 데이터베이스 단순화 & UI 개선 (2025-10-26)
+
+#### 주요 변경사항
+- 🗄️ **MySQL 전용으로 전환**
+  - SQLite 지원 제거로 코드베이스 단순화
+  - MySQL 최적화된 쿼리 및 인덱스 구조
+  - 안정적인 프로덕션 환경 지원
+
+- 📝 **클라이언트 로그 시스템 추가**
+  - 클라이언트 애플리케이션에서 로그 수집
+  - 5가지 로그 레벨 (DEBUG, INFO, WARN, ERROR, FATAL)
+  - 라이선스 키 및 디바이스별 필터링
+  - 스택 트레이스 및 상세 정보 기록
+  - 날짜 기반 로그 정리 기능
+
+- 🎨 **UI/UX 대폭 개선**
+  - 로그인 시 alert 팝업 제거 (인라인 에러 표시)
+  - 모달 z-index 충돌 문제 전면 해결
+  - 모든 생성/수정/삭제 작업에서 일관된 모달 처리
+  - 관리자 생성, 정책 관리, 라이선스 관리, 제품 관리, 비밀번호 변경, 로그 정리 등 모든 모달에서 alert가 최상위에 표시
+  - 에러 발생 시에도 모달을 먼저 닫고 alert 표시
+
+- 🐛 **버그 수정**
+  - 대시보드 활동 로그 500 에러 수정 (UNION 쿼리 타입 불일치)
+  - MySQL INDEX 생성 구문 수정 (`IF NOT EXISTS` 제거)
+  - NULL 값 처리 개선 (빈 문자열로 통일)
+  - 에러 메시지 로깅 강화
+
+#### 기술적 개선
+- `database.Initialize()` 함수 단순화 (단일 DSN 파라미터)
+- 테이블 생성 시 인덱스를 함께 정의하여 안정성 향상
+- 모달 닫기 → 300ms 대기 → alert 표시 패턴 전역 적용
+- `showConfirm` → 작업 수행 → 모달 닫기 → `showAlert` 순서 표준화
+
+### v2.2.0 - 프로젝트 전반 검토 & 동기화 (2025-10-26)
+
+#### 개선사항
+- 📚 **Swagger 문서 완전 동기화**
+  - 모든 API 엔드포인트 문서화 완료
+  - 클라이언트 로그 API 3개 추가
+  - 요청/응답 스키마 정확성 향상
+  - 95% 이상 문서화 달성
+
+- 🔍 **코드 품질 개선**
+  - 미사용 함수 및 중복 코드 제거
+  - 일관된 에러 처리 패턴 적용
+  - 코드 주석 및 문서 개선
 
 ### v2.1.0 - 디바이스 관리 강화 (2025-10-20)
 
