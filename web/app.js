@@ -1258,45 +1258,59 @@ async function handleCleanupDevices(e) {
         ? `모든 비활성 디바이스를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
         : `비활성화된 지 ${days}일이 지난 디바이스를 모두 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`;
 
-    const ok = await showConfirm(message, '디바이스 정리');
-
-    if (!ok) return;
-
-    const submitBtn = e && e.target ? e.target : document.getElementById('cleanup-confirm-btn');
-    const originalBtnText = submitBtn ? submitBtn.textContent : '';
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '정리 중...'; }
-
-    try {
-        const response = await apiFetch(`${API_BASE_URL}/api/admin/devices/cleanup`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ days }),
-            _noGlobalLoading: true
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.status === 'success') {
-            const count = result.data ? result.data.deleted_count : 0;
-            await showAlert(`${count}개의 디바이스가 삭제되었습니다.`, '디바이스 정리 완료');
-            closeModal(document.getElementById('cleanup-modal'));
-            // 대시보드 통계/활동 새로고침
-            if (document.getElementById('dashboard-content').classList.contains('active')) {
-                loadDashboardStats();
-                loadRecentActivities();
-            }
-        } else {
-            await showAlert(result.message || '디바이스 정리에 실패했습니다.', '디바이스 정리');
-        }
-    } catch (error) {
-        console.error('Failed to cleanup devices:', error);
-        await showAlert('서버 오류가 발생했습니다.', '디바이스 정리');
-    } finally {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
+    // 먼저 cleanup 모달 닫기 (confirm 모달과 충돌 방지)
+    const cleanupModal = document.getElementById('cleanup-modal');
+    if (cleanupModal) {
+        closeModal(cleanupModal);
     }
+
+    // 모달 닫힌 후 confirm 표시
+    setTimeout(async () => {
+        const ok = await showConfirm(message, '디바이스 정리');
+
+        if (!ok) {
+            // 취소 시 모달 다시 열기
+            if (cleanupModal) {
+                openModal(cleanupModal);
+            }
+            return;
+        }
+
+        const submitBtn = e && e.target ? e.target : document.getElementById('cleanup-confirm-btn');
+        const originalBtnText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '정리 중...'; }
+
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/api/admin/devices/cleanup`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ days }),
+                _noGlobalLoading: true
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                const count = result.data ? result.data.deleted_count : 0;
+                showAlert(`${count}개의 디바이스가 삭제되었습니다.`, '디바이스 정리 완료');
+                // 대시보드 통계/활동 새로고침
+                if (document.getElementById('dashboard-content').classList.contains('active')) {
+                    loadDashboardStats();
+                    loadRecentActivities();
+                }
+            } else {
+                showAlert(result.message || '디바이스 정리에 실패했습니다.', '디바이스 정리 실패');
+            }
+        } catch (error) {
+            console.error('Failed to cleanup devices:', error);
+            showAlert('서버 오류가 발생했습니다.', '디바이스 정리 실패');
+        } finally {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
+        }
+    }, 300);
 }
 
 // Window 객체에 전역 함수 노출
