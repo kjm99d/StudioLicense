@@ -79,7 +79,6 @@ export function openLicenseModal() {
   const today = new Date();
   document.getElementById('expires_at').setAttribute('min', today.toISOString().split('T')[0]);
   populateProductDropdown();
-  updatePolicyDropdown(); // 정책 드롭다운 초기화
   openModal(document.getElementById('license-modal'));
 }
 
