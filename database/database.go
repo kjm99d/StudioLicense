@@ -80,6 +80,15 @@ func createTables() error {
 			INDEX idx_products_status (status)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
+		// 정책 테이블
+		`CREATE TABLE IF NOT EXISTS policies (
+			id VARCHAR(50) PRIMARY KEY,
+			policy_name VARCHAR(255) UNIQUE NOT NULL,
+			policy_data LONGTEXT NOT NULL,
+			created_at VARCHAR(50) NOT NULL DEFAULT '',
+			updated_at VARCHAR(50) NOT NULL DEFAULT ''
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
 		// 라이선스 테이블
 		`CREATE TABLE IF NOT EXISTS licenses (
 			id VARCHAR(50) PRIMARY KEY,
@@ -101,15 +110,6 @@ func createTables() error {
 			INDEX idx_licenses_product (product_id),
 			INDEX idx_licenses_status (status),
 			INDEX idx_licenses_expires (expires_at)
-		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-
-		// 정책 테이블
-		`CREATE TABLE IF NOT EXISTS policies (
-			id VARCHAR(50) PRIMARY KEY,
-			policy_name VARCHAR(255) UNIQUE NOT NULL,
-			policy_data LONGTEXT NOT NULL,
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
-			updated_at VARCHAR(50) NOT NULL DEFAULT ''
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 디바이스 활성화 테이블
@@ -184,10 +184,10 @@ func createTables() error {
 	for _, sql := range baseTables {
 		if _, err := DB.Exec(sql); err != nil {
 			// 이미 존재하는 인덱스/테이블 오류, 존재하지 않는 컬럼 오류 무시
-			if !contains(err.Error(), "already exists") && 
-			   !contains(err.Error(), "Duplicate key name") && 
-			   !contains(err.Error(), "Duplicate") &&
-			   !contains(err.Error(), "doesn't exist in table") {
+			if !contains(err.Error(), "already exists") &&
+				!contains(err.Error(), "Duplicate key name") &&
+				!contains(err.Error(), "Duplicate") &&
+				!contains(err.Error(), "doesn't exist in table") {
 				logger.Warn("SQL execution warning: %v", err)
 			}
 		}

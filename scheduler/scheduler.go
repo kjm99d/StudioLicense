@@ -51,25 +51,39 @@ func UpdateExpiredLicenses() {
 		logger.WithFields(map[string]interface{}{
 			"error": err.Error(),
 		}).Error("Failed to check expired licenses")
-	} else {
-		defer rows.Close()
-		count := 0
-		for rows.Next() {
-			var id int
-			var key, expiresAt string
-			rows.Scan(&id, &key, &expiresAt)
+		return
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var (
+			id        string
+			key       string
+			expiresAt string
+		)
+		if scanErr := rows.Scan(&id, &key, &expiresAt); scanErr != nil {
 			logger.WithFields(map[string]interface{}{
-				"id":         id,
-				"key":        key,
-				"expires_at": expiresAt,
-				"now":        nowStr,
-			}).Info("Found expired license")
-			count++
+				"error": scanErr.Error(),
+			}).Warn("Failed to scan expired license row")
+			continue
 		}
 		logger.WithFields(map[string]interface{}{
-			"count": count,
-		}).Info("Expired licenses to update")
+			"id":         id,
+			"key":        key,
+			"expires_at": expiresAt,
+			"now":        nowStr,
+		}).Info("Found expired license")
+		count++
 	}
+	if err = rows.Err(); err != nil {
+		logger.WithFields(map[string]interface{}{
+			"error": err.Error(),
+		}).Warn("Row iteration error while scanning expired licenses")
+	}
+	logger.WithFields(map[string]interface{}{
+		"count": count,
+	}).Info("Expired licenses to update")
 
 	// 업데이트 실행
 	query := `

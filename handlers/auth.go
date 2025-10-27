@@ -63,23 +63,17 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	// 비밀번호 검증 전 로깅 (디버깅용)
 	logger.WithFields(map[string]interface{}{
-		"request_id":   requestID,
-		"username":     req.Username,
-		"admin_id":     admin.ID,
-		"stored_hash":  admin.Password,
-		"hash_length":  len(admin.Password),
-		"password_len": len(req.Password),
+		"request_id": requestID,
+		"username":   req.Username,
+		"admin_id":   admin.ID,
 	}).Info("Attempting password check")
 
 	// 비밀번호 검증
 	if !utils.CheckPassword(admin.Password, req.Password) {
 		logger.WithFields(map[string]interface{}{
-			"request_id":   requestID,
-			"username":     req.Username,
-			"admin_id":     admin.ID,
-			"stored_hash":  admin.Password,
-			"hash_length":  len(admin.Password),
-			"password_len": len(req.Password),
+			"request_id": requestID,
+			"username":   req.Username,
+			"admin_id":   admin.ID,
 		}).Warn("Login failed - invalid password")
 
 		w.WriteHeader(http.StatusUnauthorized)
@@ -272,12 +266,8 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// 저장된 해시가 예상한 해시와 일치하는지 확인
 	if verifyHash != newHash {
 		logger.WithFields(map[string]interface{}{
-			"request_id":   requestID,
-			"admin_id":     adminID,
-			"new_hash":     newHash,
-			"stored_hash":  verifyHash,
-			"new_hash_len": len(newHash),
-			"stored_len":   len(verifyHash),
+			"request_id": requestID,
+			"admin_id":   adminID,
 		}).Error("Password hash mismatch after update - possible encoding issue")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Password update verification failed", nil))
