@@ -1140,8 +1140,124 @@ table .btn {
     margin-bottom: 12px;
 }
 
-.policy-editor .policy-field-row textarea {
-    min-height: 38px;
+.policy-editor .policy-field-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 1.4fr) 140px 96px;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.policy-editor .policy-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.policy-editor .policy-field-key-wrapper {
+    grid-column: 1 / 2;
+}
+
+.policy-editor .policy-field-type-wrapper {
+    grid-column: 2 / 3;
+}
+
+.policy-editor .policy-field-label {
+    display: block;
+    position: static;
+    transform: none;
+    margin: 0;
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.policy-editor .policy-field-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #ffffff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.policy-editor .policy-field-input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    outline: none;
+}
+
+.policy-editor select.policy-field-type {
+    height: 38px;
+}
+
+.policy-editor textarea.policy-field-value {
+    min-height: 44px;
+    resize: vertical;
+}
+
+.policy-editor .policy-field-value-wrapper {
+    grid-column: 1 / 4;
+}
+
+.policy-editor .policy-field-actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    grid-column: 3 / 4;
+}
+
+.policy-editor .policy-field-remove {
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .policy-editor .policy-field-row {
+        grid-template-columns: 1fr;
+    }
+
+    .policy-editor .policy-field-key-wrapper,
+    .policy-editor .policy-field-type-wrapper,
+    .policy-editor .policy-field-value-wrapper,
+    .policy-editor .policy-field-actions {
+        grid-column: 1 / -1;
+    }
+
+    .policy-editor .policy-field-actions {
+        margin-top: 4px;
+        justify-content: flex-start;
+    }
+
+    .policy-editor .policy-field-remove {
+        width: auto;
+    }
+}
+
+.policy-data-meta {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 12px;
+}
+
+.policy-json-viewer {
+    background: #111827;
+    color: #f8fafc;
+    padding: 16px;
+    border-radius: 10px;
+    max-height: 360px;
+    overflow: auto;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    white-space: pre;
+}
+
+.modal .btn.copied {
+    background: #16a34a !important;
 }
 
 .policy-meta {

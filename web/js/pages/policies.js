@@ -59,17 +59,12 @@ export async function loadPolicies() {
         const html = policies.map(p => `
           <tr>
             <td><strong>${escapeHtml(p.policy_name)}</strong> <small class="mono" style="color:#777;">(${escapeHtml(p.id)})</small></td>
-            <td>
-              <details style="cursor:pointer;">
-                <summary style="color:#667eea;font-weight:600;">데이터 보기</summary>
-                <pre style="background:#f8f9fa;padding:12px;border-radius:8px;margin-top:8px;overflow-x:auto;font-size:12px;">${escapeHtml(JSON.stringify(JSON.parse(p.policy_data), null, 2))}</pre>
-              </details>
-            </td>
             <td style="font-size:13px;color:#6b7280;">
               생성: ${formatDateTime(p.created_at)}<br/>
               수정: ${formatDateTime(p.updated_at)}
             </td>
             <td>
+              <button class="btn btn-sm blue lighten-1" data-action="view" data-policy-id="${escapeHtml(p.id)}" data-policy-name="${escapeHtml(p.policy_name)}">👁️ 상세</button>
               <button class="btn btn-sm btn-warning" data-action="edit" data-policy-id="${escapeHtml(p.id)}">✏️ 수정</button>
               <button class="btn btn-sm btn-danger" data-action="delete" data-policy-id="${escapeHtml(p.id)}" data-policy-name="${escapeHtml(p.policy_name)}">🗑️ 삭제</button>
             </td>
@@ -88,6 +83,8 @@ export async function loadPolicies() {
             
             if (action === 'edit') {
               openEditPolicyModal(policyId);
+            } else if (action === 'view') {
+              openPolicyDataModal(policyId);
             } else if (action === 'delete') {
               await deletePolicy(policyId, policyName);
             }
@@ -265,7 +262,8 @@ function openEditPolicyModal(policyId) {
         editor.textarea.value = prettyPolicyData;
       }
       setTimeout(() => {
-        showAlert('이 정책은 폼 모드로 변환할 수 없어 JSON 모드로 전환되었습니다.', '안내');
+        const reason = err instanceof Error ? err.message : '폼 모드에서 지원하지 않는 값이 포함되어 있습니다.';
+        showAlert(`${reason} JSON 직접 입력 모드로 전환되었습니다.`, '안내');
       }, 100);
     }
   } else {
@@ -403,6 +401,60 @@ async function deletePolicy(policyId, policyName) {
     console.error('Failed to delete policy:', err);
     showAlert('서버 오류가 발생했습니다.', 'error');
   }
+}
+
+function openPolicyDataModal(policyId) {
+  const policy = policies.find(p => p.id === policyId);
+  if (!policy) {
+    showAlert('정책을 찾을 수 없습니다.', '오류');
+    return;
+  }
+
+  const modal = document.getElementById('view-policy-data-modal');
+  if (!modal) return;
+
+  const titleEl = modal.querySelector('[data-role="policy-title"]');
+  const infoEl = modal.querySelector('[data-role="policy-meta"]');
+  const preEl = modal.querySelector('[data-role="policy-json"]');
+  const copyBtn = modal.querySelector('[data-role="copy-json"]');
+
+  if (titleEl) {
+    titleEl.textContent = policy.policy_name || '정책 데이터';
+  }
+  if (infoEl) {
+    infoEl.textContent = `ID: ${policy.id}`;
+  }
+
+  let pretty = policy.policy_data || '';
+  try {
+    const parsed = JSON.parse(policy.policy_data);
+    pretty = JSON.stringify(parsed, null, 2);
+  } catch (err) {
+    // keep raw string
+  }
+
+  if (preEl) {
+    preEl.textContent = pretty;
+  }
+
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(preEl ? preEl.textContent : '');
+        copyBtn.classList.add('copied');
+        copyBtn.textContent = '복사됨!';
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.textContent = 'JSON 복사';
+        }, 1500);
+      } catch (err) {
+        console.error('Failed to copy policy JSON', err);
+        showAlert('클립보드 복사에 실패했습니다.', '오류');
+      }
+    };
+  }
+
+  openModal(modal);
 }
 
 // 전역 함수로 노출

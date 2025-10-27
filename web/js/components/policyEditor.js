@@ -1,12 +1,17 @@
 const DEFAULT_FIELD_TYPES = [
-  { value: 'string', label: '문자열' },
-  { value: 'number', label: '숫자' },
-  { value: 'boolean', label: '불리언' },
-  { value: 'json', label: 'JSON' }
+  { value: 'string', label: 'String' },
+  { value: 'number', label: 'Number' },
+  { value: 'boolean', label: 'Boolean' }
 ];
 
 const MODE_FORM = 'form';
 const MODE_JSON = 'json';
+
+let fieldIdCounter = 0;
+function nextFieldId(prefix) {
+  fieldIdCounter += 1;
+  return `${prefix}_${fieldIdCounter}`;
+}
 
 export class PolicyEditor {
   constructor(rootEl, options = {}) {
@@ -119,19 +124,33 @@ export class PolicyEditor {
 
     const row = document.createElement('div');
     row.className = 'policy-field-row';
-    row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;';
+
+    const keyId = nextFieldId('policy_key');
+    const typeId = nextFieldId('policy_type');
+    const valueId = nextFieldId('policy_value');
 
     const keyInput = document.createElement('input');
     keyInput.type = 'text';
-    keyInput.className = 'policy-field-key';
-    keyInput.placeholder = '키';
+    keyInput.id = keyId;
+    keyInput.className = 'policy-field-input policy-field-key';
+    keyInput.placeholder = '예: feature';
     keyInput.value = field.key || '';
     keyInput.required = true;
-    keyInput.style.cssText = 'flex:1;';
+
+    const keyLabel = document.createElement('label');
+    keyLabel.className = 'policy-field-label';
+    keyLabel.setAttribute('for', keyId);
+    keyLabel.textContent = '키';
+
+    const keyWrapper = document.createElement('div');
+    keyWrapper.className = 'policy-field policy-field-key-wrapper';
+    keyWrapper.append(keyLabel, keyInput);
 
     const typeSelect = document.createElement('select');
-    typeSelect.className = 'policy-field-type';
-    typeSelect.style.cssText = 'width:110px;';
+    typeSelect.id = typeId;
+    typeSelect.className = 'policy-field-input policy-field-type browser-default';
+    typeSelect.setAttribute('aria-label', '값 타입 선택');
+    typeSelect.title = '값 타입 선택';
 
     DEFAULT_FIELD_TYPES.forEach((opt) => {
       const optionEl = document.createElement('option');
@@ -143,33 +162,80 @@ export class PolicyEditor {
       ? field.type
       : 'string';
 
+    const typeLabel = document.createElement('label');
+    typeLabel.className = 'policy-field-label';
+    typeLabel.setAttribute('for', typeId);
+    typeLabel.textContent = '타입';
+
+    const typeWrapper = document.createElement('div');
+    typeWrapper.className = 'policy-field policy-field-type-wrapper';
+    typeWrapper.append(typeLabel, typeSelect);
+
     const valueInput = document.createElement('textarea');
-    valueInput.className = 'policy-field-value';
-    valueInput.rows = 1;
-    valueInput.placeholder = '값';
-    valueInput.style.cssText = 'flex:1.5;font-family:monospace;';
+    valueInput.id = valueId;
+    valueInput.className = 'policy-field-input policy-field-value';
+    valueInput.rows = 2;
     valueInput.value = field.value !== undefined && field.value !== null ? String(field.value) : '';
+
+    const valueLabel = document.createElement('label');
+    valueLabel.className = 'policy-field-label';
+    valueLabel.setAttribute('for', valueId);
+    valueLabel.textContent = '값';
+
+    const valueWrapper = document.createElement('div');
+    valueWrapper.className = 'policy-field policy-field-value-wrapper';
+    valueWrapper.append(valueLabel, valueInput);
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
-    removeBtn.className = 'btn btn-small red lighten-2';
+    removeBtn.className = 'btn btn-small red lighten-2 policy-field-remove';
     removeBtn.textContent = '삭제';
+    removeBtn.title = '이 필드를 제거합니다';
 
     removeBtn.addEventListener('click', () => {
       if (this.fieldListEl?.children.length <= 1) {
         keyInput.value = '';
         valueInput.value = '';
         typeSelect.value = 'string';
+        updateValuePlaceholder();
         return;
       }
       row.remove();
     });
 
-    row.appendChild(keyInput);
-    row.appendChild(typeSelect);
-    row.appendChild(valueInput);
-    row.appendChild(removeBtn);
+    const actionsWrapper = document.createElement('div');
+    actionsWrapper.className = 'policy-field-actions';
+    actionsWrapper.appendChild(removeBtn);
 
+    const updateValuePlaceholder = () => {
+      switch (typeSelect.value) {
+        case 'number':
+          valueInput.placeholder = '숫자 (예: 10)';
+          valueInput.rows = 1;
+          break;
+        case 'boolean':
+          valueInput.placeholder = 'true 또는 false';
+          valueInput.rows = 1;
+          break;
+        default:
+          valueInput.placeholder = '텍스트 값 (예: enabled)';
+          valueInput.rows = 2;
+      }
+    };
+
+    typeSelect.addEventListener('change', () => {
+      updateValuePlaceholder();
+      if (typeSelect.value === 'boolean') {
+        const lower = valueInput.value.trim().toLowerCase();
+        if (lower !== 'true' && lower !== 'false') {
+          valueInput.value = '';
+        }
+      }
+    });
+
+    updateValuePlaceholder();
+
+    row.append(keyWrapper, typeWrapper, valueWrapper, actionsWrapper);
     this.fieldListEl.appendChild(row);
   }
 
@@ -193,10 +259,18 @@ export class PolicyEditor {
     if (!this.fieldListEl) return;
     this.fieldListEl.innerHTML = '';
 
-    Object.entries(parsed).forEach(([key, value]) => {
-      const field = this._buildFieldFromValue(key, value);
-      this.addField(field);
-    });
+    try {
+      Object.entries(parsed).forEach(([key, value]) => {
+        const field = this._buildFieldFromValue(key, value);
+        this.addField(field);
+      });
+    } catch (err) {
+      this.fieldListEl.innerHTML = '';
+      if (err instanceof Error) {
+        throw err;
+      }
+      throw new Error('폼 모드는 문자열/숫자/불리언 값만 지원합니다.');
+    }
 
     if (!this.fieldListEl.children.length) {
       this.addField();
@@ -284,16 +358,6 @@ export class PolicyEditor {
         if (rawValue.toLowerCase() === 'false') return false;
         throw new Error(`"${keyLabel}" 값은 true 또는 false 여야 합니다.`);
       }
-      case 'json': {
-        if (!rawValue) {
-          throw new Error(`"${keyLabel}" 값이 비어 있습니다.`);
-        }
-        try {
-          return JSON.parse(rawValue);
-        } catch (err) {
-          throw new Error(`"${keyLabel}" 필드의 JSON 값이 올바르지 않습니다.`);
-        }
-      }
       case 'string':
       default:
         return originalValue;
@@ -301,6 +365,9 @@ export class PolicyEditor {
   }
 
   _buildFieldFromValue(key, value) {
+    if (value === null || typeof value === 'object') {
+      throw new Error('폼 모드는 문자열/숫자/불리언 값만 지원합니다.');
+    }
     if (typeof value === 'string') {
       return { key, type: 'string', value };
     }

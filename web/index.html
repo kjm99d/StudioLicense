@@ -412,7 +412,6 @@
                         <thead>
                             <tr>
                                 <th>정책명</th>
-                                <th>정책 데이터</th>
                                 <th>생성/수정 시간</th>
                                 <th>작업</th>
                             </tr>
@@ -798,7 +797,7 @@
                         <div class="policy-editor-form" id="create_policy_editor_form">
                             <div class="policy-field-list" id="create_policy_field_list"></div>
                             <button type="button" class="btn btn-small blue lighten-1 add-policy-field-btn" data-action="add-field">필드 추가</button>
-                            <small style="display:block;margin-top:8px;color:#6b7280;">키-값 쌍을 입력하면 저장 시 JSON으로 변환됩니다.</small>
+                            <small style="display:block;margin-top:8px;color:#6b7280;">문자열/숫자/불리언 값만 입력할 수 있습니다. 중첩 구조는 JSON 직접 입력을 이용하세요.</small>
                         </div>
                         <div class="policy-editor-json" id="create_policy_editor_json" hidden>
                             <textarea id="policy_data" name="policy_data" rows="10" placeholder='{"feature": "enabled"}' style="font-family: monospace;"></textarea>
@@ -841,7 +840,7 @@
                         <div class="policy-editor-form" id="edit_policy_editor_form">
                             <div class="policy-field-list" id="edit_policy_field_list"></div>
                             <button type="button" class="btn btn-small blue lighten-1 add-policy-field-btn" data-action="add-field">필드 추가</button>
-                            <small style="display:block;margin-top:8px;color:#6b7280;">키-값 쌍을 입력하면 저장 시 JSON으로 변환됩니다.</small>
+                            <small style="display:block;margin-top:8px;color:#6b7280;">문자열/숫자/불리언 값만 입력할 수 있습니다. 중첩 구조는 JSON 직접 입력을 이용하세요.</small>
                         </div>
                         <div class="policy-editor-json" id="edit_policy_editor_json" hidden>
                             <textarea id="edit_policy_data" name="policy_data" rows="12" style="font-family: monospace;"></textarea>
@@ -854,6 +853,28 @@
                     <button type="submit" class="btn blue">저장</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 정책 데이터 보기 모달 -->
+    <div id="view-policy-data-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-role="policy-title">정책 데이터</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="policy-data-meta" data-role="policy-meta"></div>
+                <pre class="policy-json-viewer" data-role="policy-json"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn grey darken-1 modal-close">닫기</button>
+                <button type="button" class="btn blue" data-role="copy-json">JSON 복사</button>
+            </div>
         </div>
     </div>
 
