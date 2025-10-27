@@ -5,60 +5,101 @@ import { formatDateTime, escapeHtml } from '../utils.js';
 
 export async function loadAdmins() {
   try {
-    const res = await apiFetch(`${API_BASE_URL}/api/admin/admins`, { headers: { 'Authorization': `Bearer ${state.token}` } });
-    const body = await res.json();
     const tbody = document.getElementById('admins-tbody');
     if (!tbody) {
       console.error('admins-tbody element not found');
       return;
     }
+    // 로딩 상태 표시 (요청 시작 전)
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">로딩 중...</td></tr>';
+
+    const res = await apiFetch(`${API_BASE_URL}/api/admin/admins`, { headers: { 'Authorization': `Bearer ${state.token}` } });
+    const body = await res.json();
     
     if (res.ok && body.status === 'success') {
       const admins = body.data || [];
       console.log('Loaded admins:', admins);
       
+      // 역할 정규화 헬퍼
+      const isSuper = (role) => {
+        if (!role) return false;
+        return String(role).toLowerCase().replace(/-/g, '_') === 'super_admin';
+      };
+      
       if (admins.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center">관리자가 없습니다.</td></tr>';
       } else {
-        const html = admins.map(a => `
-          <tr>
-            <td>${escapeHtml(a.username)} <small class="mono" style="color:#777;">(${escapeHtml(a.id)})</small></td>
-            <td>${escapeHtml(a.email || '-')}</td>
-            <td>
-              <span class="role-badge ${a.role === 'super_admin' ? 'super' : 'admin'}">
-                <span class="icon">${a.role === 'super_admin' ? '⭐' : '👤'}</span>
-                ${a.role === 'super_admin' ? 'Super Admin' : 'Admin'}
-              </span>
-            </td>
-            <td>${formatDateTime(a.created_at)}</td>
-            <td>
-              ${a.role === 'super_admin' ? '-' : `
-                <button class="btn btn-sm btn-warning" data-action="reset" data-admin-id="${escapeHtml(a.id)}" data-admin-name="${escapeHtml(a.username)}">🔑 비밀번호 초기화</button>
-                <button class="btn btn-sm btn-danger" data-action="delete" data-admin-id="${escapeHtml(a.id)}" data-admin-name="${escapeHtml(a.username)}">🗑️ 삭제</button>
-              `}
-            </td>
-          </tr>
-        `).join('');
-        
-        tbody.innerHTML = html;
-        
-        // 이벤트 리스너 추가
-        tbody.querySelectorAll('button[data-action]').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const action = btn.dataset.action;
-            const adminId = btn.dataset.adminId;
-            const adminName = btn.dataset.adminName;
-            
-            if (action === 'reset') {
-              await resetAdminPassword(adminId, adminName, btn);
-            } else if (action === 'delete') {
-              await deleteAdmin(adminId, adminName, btn);
-            }
-          });
+        // DOM API로 안전하게 렌더링하여 셀 누락 문제를 방지
+        tbody.innerHTML = '';
+        admins.forEach(a => {
+          const tr = document.createElement('tr');
+
+          // 아이디/유저명
+          const tdUser = document.createElement('td');
+          tdUser.innerHTML = `${escapeHtml(a.username)} <small class="mono" style="color:#777;">(${escapeHtml(a.id)})</small>`;
+          tr.appendChild(tdUser);
+
+          // 이메일
+          const tdEmail = document.createElement('td');
+          tdEmail.textContent = a.email ? String(a.email) : '-';
+          tr.appendChild(tdEmail);
+
+          // 역할 배지
+          const tdRole = document.createElement('td');
+          const roleSpan = document.createElement('span');
+          roleSpan.className = `role-badge ${isSuper(a.role) ? 'super' : 'admin'}`;
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'icon';
+          iconSpan.textContent = isSuper(a.role) ? '⭐' : '👤';
+          roleSpan.appendChild(iconSpan);
+          roleSpan.appendChild(document.createTextNode(` ${isSuper(a.role) ? 'Super Admin' : 'Admin'}`));
+          tdRole.appendChild(roleSpan);
+          tr.appendChild(tdRole);
+
+          // 생성일
+          const tdCreated = document.createElement('td');
+          tdCreated.textContent = formatDateTime(a.created_at);
+          tr.appendChild(tdCreated);
+
+          // 작업
+          const tdActions = document.createElement('td');
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'actions-cell';
+          if (isSuper(a.role)) {
+            const disabledA = document.createElement('a');
+            disabledA.href = '#';
+            disabledA.className = 'btn btn-sm btn-warning disabled';
+            disabledA.setAttribute('aria-disabled', 'true');
+            disabledA.title = '슈퍼 관리자는 비활성화됨';
+            disabledA.textContent = '🔒 초기화 불가';
+            actionsDiv.appendChild(disabledA);
+          } else {
+            const resetA = document.createElement('a');
+            resetA.href = '#';
+            resetA.className = 'btn btn-sm btn-warning';
+            resetA.dataset.action = 'reset';
+            resetA.dataset.adminId = String(a.id);
+            resetA.dataset.adminName = String(a.username);
+            resetA.textContent = '🔑 비밀번호 초기화';
+
+            const delA = document.createElement('a');
+            delA.href = '#';
+            delA.className = 'btn btn-sm btn-danger';
+            delA.dataset.action = 'delete';
+            delA.dataset.adminId = String(a.id);
+            delA.dataset.adminName = String(a.username);
+            delA.textContent = '🗑️ 삭제';
+
+            actionsDiv.appendChild(resetA);
+            actionsDiv.appendChild(delA);
+          }
+          tdActions.appendChild(actionsDiv);
+          tr.appendChild(tdActions);
+
+          tbody.appendChild(tr);
         });
-        
-        console.log('Admin table updated successfully');
+
+        console.log('Admin table updated successfully (DOM render)');
       }
     } else {
       tbody.innerHTML = `<tr><td colspan="5" class="text-center">불러오기에 실패했습니다: ${escapeHtml(body.message || '')}</td></tr>`;

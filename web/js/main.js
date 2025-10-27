@@ -201,6 +201,30 @@ function setupEventListeners() {
   document.getElementById('activities-type')?.addEventListener('change', () => loadRecentActivities());
   document.getElementById('activities-action')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadRecentActivities(); });
   document.getElementById('activities-limit')?.addEventListener('change', () => loadRecentActivities());
+
+  // 관리자 테이블: 이벤트 위임으로 액션 핸들링 (새로고침/재렌더 안정화)
+  const adminsTbody = document.getElementById('admins-tbody');
+  if (adminsTbody) {
+    adminsTbody.addEventListener('click', async (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      e.preventDefault();
+      const action = target.dataset.action;
+      const adminId = target.dataset.adminId;
+      const adminName = target.dataset.adminName;
+      if (!adminId) return;
+
+      try {
+        if (action === 'reset' && window.resetAdminPassword) {
+          await window.resetAdminPassword(adminId, adminName, target);
+        } else if (action === 'delete' && window.deleteAdmin) {
+          await window.deleteAdmin(adminId, adminName, target);
+        }
+      } catch (err) {
+        console.error('Admin action failed:', err);
+      }
+    });
+  }
 }
 
 function handleLogout() {
@@ -258,7 +282,6 @@ async function fetchMeAndGateUI() {
       if (state.currentRole === 'super_admin') {
         const tab = document.getElementById('admins-tab');
         if (tab) tab.style.display = '';
-        document.querySelector('[data-page="admins"]')?.addEventListener('click', () => loadAdmins());
       } else {
         const cleanupBtn = document.getElementById('cleanup-devices-btn');
         if (cleanupBtn) cleanupBtn.style.display = 'none';

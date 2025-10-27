@@ -300,6 +300,15 @@ table td:last-child {
     flex-shrink: 0;
 }
 
+/* Ensure admin actions are laid out and visible */
+.actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.actions-cell .btn { margin-right: 0 !important; }
+
 tbody tr:hover {
     background: var(--bg-color);
 }

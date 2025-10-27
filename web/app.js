@@ -10,6 +10,9 @@ let currentRole = null;
 // 모달 레이어 관리 (글로벌 로딩 z-index=13000보다 항상 위)
 let topZIndex = 13000;
 
+// Feature gate: disable legacy admins page when modern SPA handles it
+const LEGACY_ADMINS_ENABLED = !(typeof window !== 'undefined' && window.__legacyAdminsEnabled === false);
+
 // 글로벌 로딩 오버레이 제어
 function showLoading() {
     const el = document.getElementById('global-loading');
@@ -259,8 +262,10 @@ async function fetchMeAndGateUI() {
             if (currentRole === 'super_admin') {
                 const tab = document.getElementById('admins-tab');
                 if (tab) tab.style.display = '';
-                // 기본 로드: 관리자 탭이 열릴 때 목록 불러오기
-                document.querySelector('[data-page="admins"]').addEventListener('click', () => loadAdmins());
+                // 기본 로드: 관리자 탭이 열릴 때 목록 불러오기 (only if legacy enabled)
+                if (LEGACY_ADMINS_ENABLED) {
+                    document.querySelector('[data-page="admins"]').addEventListener('click', () => loadAdmins());
+                }
             } else {
                 // 위험 작업 버튼 감춤 (정리)
                 const cleanupBtn = document.getElementById('cleanup-devices-btn');
@@ -301,7 +306,9 @@ function switchContent(page) {
         } else if (page === 'products') {
             loadProducts();
         } else if (page === 'admins') {
-            loadAdmins();
+            if (LEGACY_ADMINS_ENABLED) {
+                loadAdmins();
+            }
         } else if (page === 'swagger') {
             window.open('/swagger/index.html', '_blank');
     }
@@ -330,6 +337,7 @@ async function loadDashboardStats() {
 
 // 관리자 목록 로드 (슈퍼 전용)
 async function loadAdmins() {
+    if (!LEGACY_ADMINS_ENABLED) return;
     try {
         const res = await apiFetch(`${API_BASE_URL}/api/admin/admins`, { headers: { 'Authorization': `Bearer ${token}` } });
         const body = await res.json();
