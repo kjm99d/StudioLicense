@@ -51,3 +51,55 @@ export function formatAdminAction(action) {
   };
   return actionMap[action] || action;
 }
+
+export function safeParseJSON(str) {
+  try {
+    if (!str) return {};
+    return JSON.parse(str);
+  } catch (_) {
+    return {};
+  }
+}
+
+export function getValidationWarning(lastValidated) {
+  if (!lastValidated) return { class: '', text: '' };
+  
+  const now = new Date();
+  const validated = new Date(lastValidated);
+  const daysDiff = Math.floor((now - validated) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff > 30) {
+    return { class: 'validation-warning', text: `(${daysDiff}일 전)` };
+  } else if (daysDiff > 7) {
+    return { class: 'validation-old', text: `(${daysDiff}일 전)` };
+  }
+  return { class: '', text: '' };
+}
+
+export function renderDeviceStatusBadge(status) {
+  const map = {
+    'active': '<span class="new badge green" data-badge-caption="">활성</span>',
+    'deactivated': '<span class="new badge red" data-badge-caption="">비활성</span>'
+  };
+  return map[status] || `<span class="new badge grey" data-badge-caption="">${escapeHtml(status || '-')}</span>`;
+}
+
+export async function copyToClipboard(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  
+  const text = el.textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    // 복사 성공 피드백
+    const originalText = el.parentElement.innerHTML;
+    el.parentElement.innerHTML = '✅ 복사됨!';
+    setTimeout(() => {
+      el.parentElement.innerHTML = originalText;
+    }, 1500);
+  } catch (err) {
+    console.error('Failed to copy:', err);
+    const { showAlert } = await import('./modals.js');
+    await showAlert('클립보드 복사에 실패했습니다.', '복사 실패');
+  }
+}

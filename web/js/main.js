@@ -51,8 +51,11 @@ import { loadDashboardStats, loadRecentActivities } from './pages/dashboard.js';
 import { loadPolicies, openCreatePolicyModal, handleCreatePolicy, handleEditPolicy } from './pages/policies.js'; // 정책 관리 페이지
 import { loadProducts, showProductModal, initProductsPage } from './pages/products.js'; // 제품 관리 페이지
 import { initClientLogsPage } from './pages/client-logs.js'; // 클라이언트 로그 페이지
+import './pages/account.js'; // 비밀번호 변경 (전역 핸들러 등록)
+import './pages/maintenance.js'; // 디바이스 정리 (전역 핸들러 등록)
+import './pages/devices.js'; // 디바이스 관리 (전역 핸들러 등록)
 
-// Expose helpers globally for legacy scripts (products.js, device rendering still in app.js)
+// Expose helpers globally for HTML onclick handlers and cross-module access
 window.apiFetch = apiFetch;
 window.API_BASE_URL = API_BASE_URL;
 window.formatDate = formatDate;
@@ -62,10 +65,10 @@ window.showConfirm = showConfirm;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.renderStatusBadge = renderStatusBadge;
-window.state = state; // state 전역 노출
+window.state = state;
 window.token = state.token;
 
-// Expose page functions globally until we fully refactor event handlers
+// Expose page functions globally for HTML onclick handlers
 window.loadLicenses = loadLicenses;
 window.openLicenseModal = openLicenseModal;
 window.viewLicense = viewLicense;
@@ -81,11 +84,11 @@ window.handleLogout = handleLogout;
 document.addEventListener('DOMContentLoaded', () => {
   console.log('📄 DOMContentLoaded event fired');
   
-  // 페이지 로드 시 token을 다시 읽음 (로그인 후 redirect될 때 사용)
   state.token = localStorage.getItem('token');
   
   setupModalBehaviors();
   setupEventListeners();
+  
   if (state.token) {
     console.log('✅ Token found, showing dashboard');
     showDashboard();
@@ -99,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
   console.log('⚙️ setupEventListeners called');
   document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
-  console.log('✅ Login form listener attached');
   
   // Modal open buttons - store trigger element for focus return
   const changePwBtn = document.getElementById('change-password-btn');
@@ -124,7 +126,10 @@ function setupEventListeners() {
     });
   }
   
-  document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => { e.preventDefault(); switchContent(e.target.dataset.page); }));
+  document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => { 
+    e.preventDefault(); 
+    switchContent(e.target.dataset.page); 
+  }));
   
   const createLicenseBtn = document.getElementById('create-license-btn');
   if (createLicenseBtn) {
@@ -136,49 +141,53 @@ function setupEventListeners() {
   }
   
   document.getElementById('create-product-btn')?.addEventListener('click', () => {
-    console.log('Create product button clicked');
-    console.log('window.openProductModal:', typeof window.openProductModal);
     if (window.openProductModal) {
       window.openProductModal();
     } else {
       console.error('openProductModal function not found!');
     }
   });
-  document.getElementById('cleanup-devices-btn')?.addEventListener('click', () => window.openCleanupModal && window.openCleanupModal());
-  document.getElementById('cleanup-confirm-btn')?.addEventListener('click', (e) => window.handleCleanupDevices && window.handleCleanupDevices(e));
   
-  // License form 이벤트 리스너는 한 번만 등록 - 중복 방지
+  document.getElementById('cleanup-devices-btn')?.addEventListener('click', () => {
+    if (window.openCleanupModal) window.openCleanupModal();
+  });
+  
+  document.getElementById('cleanup-confirm-btn')?.addEventListener('click', (e) => {
+    if (window.handleCleanupDevices) window.handleCleanupDevices(e);
+  });
+  
+  // License form
   const licenseForm = document.getElementById('license-form');
   if (licenseForm) {
-    // 기존 리스너 제거
     licenseForm.replaceWith(licenseForm.cloneNode(true));
-    // 새 리스너 등록
     document.getElementById('license-form')?.addEventListener('submit', handleCreateLicense);
   }
   
-  // Product form 이벤트 리스너는 한 번만 등록 - 중복 방지
+  // Product form
   const productForm = document.getElementById('product-form');
   if (productForm) {
-    // 기존 리스너 제거
     productForm.replaceWith(productForm.cloneNode(true));
-    // 새 리스너 등록
-    document.getElementById('product-form')?.addEventListener('submit', (e) => window.handleCreateProduct && window.handleCreateProduct(e));
+    document.getElementById('product-form')?.addEventListener('submit', (e) => {
+      if (window.handleCreateProduct) window.handleCreateProduct(e);
+    });
   }
+  
   document.getElementById('create-admin-form')?.addEventListener('submit', handleCreateAdmin);
   
-  // Policy form 이벤트 리스너 등록
+  // Policy forms
   const createPolicyForm = document.getElementById('create-policy-form');
   if (createPolicyForm) {
     createPolicyForm.replaceWith(createPolicyForm.cloneNode(true));
     document.getElementById('create-policy-form')?.addEventListener('submit', handleCreatePolicy);
   }
+  
   const editPolicyForm = document.getElementById('edit-policy-form');
   if (editPolicyForm) {
     editPolicyForm.replaceWith(editPolicyForm.cloneNode(true));
     document.getElementById('edit-policy-form')?.addEventListener('submit', handleEditPolicy);
   }
   
-  // License edit form 이벤트 리스너 등록
+  // License edit form
   const editLicenseForm = document.getElementById('edit-license-form');
   if (editLicenseForm) {
     editLicenseForm.replaceWith(editLicenseForm.cloneNode(true));
@@ -194,21 +203,27 @@ function setupEventListeners() {
     });
   });
   
-  document.getElementById('change-password-form')?.addEventListener('submit', (e) => window.handleChangePassword && window.handleChangePassword(e));
+  document.getElementById('change-password-form')?.addEventListener('submit', (e) => {
+    if (window.handleChangePassword) window.handleChangePassword(e);
+  });
+  
   document.getElementById('search-input')?.addEventListener('input', debounce(handleSearch, 500));
   document.getElementById('status-filter')?.addEventListener('change', handleFilter);
   document.getElementById('activities-apply')?.addEventListener('click', () => loadRecentActivities());
   document.getElementById('activities-type')?.addEventListener('change', () => loadRecentActivities());
-  document.getElementById('activities-action')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadRecentActivities(); });
+  document.getElementById('activities-action')?.addEventListener('keydown', (e) => { 
+    if (e.key === 'Enter') loadRecentActivities(); 
+  });
   document.getElementById('activities-limit')?.addEventListener('change', () => loadRecentActivities());
 
-  // 관리자 테이블: 이벤트 위임으로 액션 핸들링 (새로고침/재렌더 안정화)
+  // 관리자 테이블: 이벤트 위임
   const adminsTbody = document.getElementById('admins-tbody');
   if (adminsTbody) {
     adminsTbody.addEventListener('click', async (e) => {
       const target = e.target.closest('[data-action]');
       if (!target) return;
       e.preventDefault();
+      
       const action = target.dataset.action;
       const adminId = target.dataset.adminId;
       const adminName = target.dataset.adminName;
@@ -250,7 +265,9 @@ function showDashboard() {
 }
 
 function switchContent(page) {
-  document.querySelectorAll('.nav-link').forEach(link => { link.classList.toggle('active', link.dataset.page === page); });
+  document.querySelectorAll('.nav-link').forEach(link => { 
+    link.classList.toggle('active', link.dataset.page === page); 
+  });
   document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
   document.getElementById(`${page}-content`)?.classList.add('active');
 
@@ -275,10 +292,14 @@ function switchContent(page) {
 
 async function fetchMeAndGateUI() {
   try {
-    const res = await apiFetch(`${API_BASE_URL}/api/admin/me`, { headers: { 'Authorization': `Bearer ${state.token}` } });
+    const res = await apiFetch(`${API_BASE_URL}/api/admin/me`, { 
+      headers: { 'Authorization': `Bearer ${state.token}` } 
+    });
     const body = await res.json();
+    
     if (res.ok && body.status === 'success') {
       state.currentRole = body.data?.role || null;
+      
       if (state.currentRole === 'super_admin') {
         const tab = document.getElementById('admins-tab');
         if (tab) tab.style.display = '';
@@ -287,8 +308,7 @@ async function fetchMeAndGateUI() {
         if (cleanupBtn) cleanupBtn.style.display = 'none';
       }
     }
-  } catch (e) { console.warn('Failed to fetch me:', e); }
+  } catch (e) { 
+    console.warn('Failed to fetch me:', e); 
+  }
 }
-
-// Load legacy SPA (app.js + products.js) for device/product/password handlers still there
-import './legacy-bridge.js';

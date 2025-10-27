@@ -3,6 +3,7 @@ import { apiFetch, API_BASE_URL } from '../api.js';
 import { openModal, closeModal, showAlert, showConfirm } from '../modals.js';
 import { formatDate } from '../utils.js';
 import { renderStatusBadge } from '../ui.js';
+import { renderDeviceCard } from './devices.js';
 
 let productsCached = null; // 제품 목록 캐시
 
@@ -273,8 +274,7 @@ async function loadDevicesForLicense(id) {
       if (devices.length === 0) {
         container.textContent = '등록된 디바이스가 없습니다.';
       } else {
-        // renderDeviceCard is in app.js still, keep global call
-        container.innerHTML = devices.map(d => window.renderDeviceCard ? window.renderDeviceCard(d) : '').join('');
+        container.innerHTML = devices.map(renderDeviceCard).join('');
       }
     } else {
       container.classList.remove('loading');
