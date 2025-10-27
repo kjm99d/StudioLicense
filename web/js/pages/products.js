@@ -2,7 +2,8 @@
 
 import { state } from '../state.js';
 import { showAlert, openModal, closeModal } from '../modals.js';
-import { apiFetch, API_BASE_URL } from '../api.js';
+import { renderStatusBadge } from '../ui.js';
+import { formatDate } from '../utils.js';
 
 async function loadProducts() {
     try {
@@ -121,7 +122,11 @@ function showProductModal(productId = null) {
         window.editingProductId = null;
     }
 
-    modal.style.display = 'block';
+    if (document.activeElement instanceof HTMLElement) {
+        modal._triggerElement = document.activeElement;
+    }
+
+    openModal(modal);
 }
 
 async function loadProductDetail(productId, nameInput, descriptionInput) {
@@ -202,7 +207,7 @@ async function handleCreateProduct(event) {
 function closeProductModal() {
     const modal = document.getElementById('product-modal');
     if (modal) {
-        modal.style.display = 'none';
+        closeModal(modal);
     }
     window.editingProductId = null;
 }
@@ -210,21 +215,6 @@ function closeProductModal() {
 // 페이지 초기화
 function initProductsPage() {
     loadProducts();
-
-    // 모달 이벤트
-    const modal = document.getElementById('product-modal');
-    if (modal) {
-        const closeBtn = modal.querySelector('.close');
-        if (closeBtn) {
-            closeBtn.onclick = closeProductModal;
-        }
-
-        window.onclick = function(event) {
-            if (event.target === modal) {
-                closeProductModal();
-            }
-        };
-    }
 
     // 생성 버튼 클릭 이벤트
     const createBtn = document.querySelector('#create-product-btn');
@@ -244,7 +234,9 @@ window.showProductModal = showProductModal;
 window.closeProductModal = closeProductModal;
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
+window.openProductModal = showProductModal; // legacy alias for main.js
+window.handleCreateProduct = handleCreateProduct;
 
-export { loadProducts, showProductModal, initProductsPage };
+export { loadProducts, showProductModal, initProductsPage, handleCreateProduct };
 window.deleteProductConfirm = deleteProductConfirm;
 
