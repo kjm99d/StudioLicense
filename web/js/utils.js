@@ -47,7 +47,10 @@ export function formatAdminAction(action) {
     'cleanup_devices': '디바이스 정리',
     'create_admin': '관리자 생성',
     'reset_password': '비밀번호 초기화',
-    'delete_admin': '관리자 삭제'
+    'delete_admin': '관리자 삭제',
+    'upload_file': '파일 업로드',
+    'delete_file': '파일 삭제',
+    'download_file': '파일 다운로드'
   };
   return actionMap[action] || action;
 }

@@ -157,6 +157,43 @@ func createTables() error {
 			INDEX idx_created (created_at)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
+		// 파일 자산 테이블
+		`CREATE TABLE IF NOT EXISTS files (
+			id VARCHAR(50) PRIMARY KEY,
+			original_name VARCHAR(255) NOT NULL,
+			stored_name VARCHAR(255) NOT NULL,
+			description TEXT,
+			mime_type VARCHAR(120) NOT NULL,
+			file_size BIGINT NOT NULL,
+			checksum VARCHAR(128),
+			storage_path VARCHAR(500) NOT NULL,
+			uploaded_by VARCHAR(50),
+			uploaded_username VARCHAR(100),
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			INDEX idx_files_original_name (original_name),
+			INDEX idx_files_uploaded_by (uploaded_by)
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
+		// 제품-파일 매핑 테이블
+		`CREATE TABLE IF NOT EXISTS product_files (
+			id VARCHAR(50) PRIMARY KEY,
+			product_id VARCHAR(50) NOT NULL,
+			file_id VARCHAR(50) NOT NULL,
+			label VARCHAR(255) NOT NULL,
+			description TEXT,
+			sort_order INT NOT NULL DEFAULT 0,
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			delivery_url VARCHAR(1000),
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+			FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+			UNIQUE KEY unique_product_file_label (product_id, label),
+			INDEX idx_product_files_product (product_id),
+			INDEX idx_product_files_active (is_active)
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
 		// 클라이언트 로그 테이블
 		`CREATE TABLE IF NOT EXISTS client_logs (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -50,7 +50,7 @@ function displayClientLogs(logs, meta) {
             <td>${escapeHtml(truncate(log.message, 50))}</td>
             <td>
                 <button class="btn-small blue" onclick="event.stopPropagation(); showLogDetail(${log.id})">
-                    <i class="material-icons">visibility</i>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
                 </button>
             </td>
         </tr>
@@ -252,9 +252,9 @@ function renderLogsPagination(meta) {
 
     // 이전 버튼
     if (page > 1) {
-        html += `<li class="waves-effect"><a href="#" onclick="loadClientLogs(${page - 1})"><i class="material-icons">chevron_left</i></a></li>`;
+        html += `<li class="waves-effect"><a href="#" onclick="loadClientLogs(${page - 1})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a></li>`;
     } else {
-        html += `<li class="disabled"><a href="#"><i class="material-icons">chevron_left</i></a></li>`;
+        html += `<li class="disabled"><a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a></li>`;
     }
 
     // 페이지 번호
@@ -290,9 +290,9 @@ function renderLogsPagination(meta) {
 
     // 다음 버튼
     if (page < total_pages) {
-        html += `<li class="waves-effect"><a href="#" onclick="loadClientLogs(${page + 1})"><i class="material-icons">chevron_right</i></a></li>`;
+        html += `<li class="waves-effect"><a href="#" onclick="loadClientLogs(${page + 1})"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a></li>`;
     } else {
-        html += `<li class="disabled"><a href="#"><i class="material-icons">chevron_right</i></a></li>`;
+        html += `<li class="disabled"><a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a></li>`;
     }
 
     html += '</ul>';

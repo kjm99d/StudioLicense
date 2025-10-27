@@ -211,6 +211,16 @@ func main() {
 			middleware.SetJSONHeader,
 		))
 
+	// 제품 파일 매핑 관리 API
+	mux.HandleFunc("/api/admin/product-files",
+		middleware.ChainMiddleware(
+			productFileRouter,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
 	// 정책 관리 API (인증 필요)
 	mux.HandleFunc("/api/admin/policies",
 		middleware.ChainMiddleware(
@@ -324,6 +334,25 @@ func main() {
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
 			middleware.RequireRoles("super_admin"),
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	// 파일 서버 API
+	mux.HandleFunc("/api/admin/files",
+		middleware.ChainMiddleware(
+			fileHandler,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	mux.HandleFunc("/api/admin/files/",
+		middleware.ChainMiddleware(
+			fileDetailHandler,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -456,6 +485,22 @@ func productDetailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// productFileRouter 제품-파일 매핑 핸들러
+func productFileRouter(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handlers.ListProductFiles(w, r)
+	case http.MethodPost:
+		handlers.AttachProductFile(w, r)
+	case http.MethodPut:
+		handlers.UpdateProductFile(w, r)
+	case http.MethodDelete:
+		handlers.DeleteProductFile(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
 // policyHandler 정책 목록/생성 핸들러
 func policyHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -477,6 +522,38 @@ func policyDetailHandler(w http.ResponseWriter, r *http.Request) {
 		handlers.UpdatePolicy(w, r)
 	case http.MethodDelete:
 		handlers.DeletePolicy(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// fileHandler 파일 목록/업로드 핸들러
+func fileHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handlers.ListFiles(w, r)
+	case http.MethodPost:
+		handlers.UploadFile(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// fileDetailHandler 파일 상세/다운로드/삭제 핸들러
+func fileDetailHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handlers.GetFile(w, r)
+	case http.MethodDelete:
+		roleVal := r.Context().Value("role")
+		if roleVal != nil {
+			if role, _ := roleVal.(string); role != "super_admin" && role != "admin" {
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"status":"error","message":"Forbidden: insufficient role"}`))
+				return
+			}
+		}
+		handlers.DeleteFile(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

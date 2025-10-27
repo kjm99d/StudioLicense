@@ -51,6 +51,7 @@ import { loadDashboardStats, loadRecentActivities } from './pages/dashboard.js';
 import { loadPolicies, openCreatePolicyModal, handleCreatePolicy, handleEditPolicy } from './pages/policies.js'; // 정책 관리 페이지
 import { loadProducts, showProductModal, initProductsPage } from './pages/products.js'; // 제품 관리 페이지
 import { initClientLogsPage } from './pages/client-logs.js'; // 클라이언트 로그 페이지
+import { loadFiles, openUploadFileModal, initFilesPage } from './pages/files.js'; // 파일 서버 페이지
 import './pages/account.js'; // 비밀번호 변경 (전역 핸들러 등록)
 import './pages/maintenance.js'; // 디바이스 정리 (전역 핸들러 등록)
 import './pages/devices.js'; // 디바이스 관리 (전역 핸들러 등록)
@@ -79,6 +80,8 @@ window.loadRecentActivities = loadRecentActivities;
 window.loadProducts = loadProducts;
 window.showProductModal = showProductModal;
 window.initProductsPage = initProductsPage;
+window.loadFiles = loadFiles;
+window.openUploadFileModal = openUploadFileModal;
 window.handleLogout = handleLogout;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -147,7 +150,7 @@ function setupEventListeners() {
       console.error('openProductModal function not found!');
     }
   });
-  
+
   document.getElementById('cleanup-devices-btn')?.addEventListener('click', () => {
     if (window.openCleanupModal) window.openCleanupModal();
   });
@@ -171,6 +174,8 @@ function setupEventListeners() {
       if (window.handleCreateProduct) window.handleCreateProduct(e);
     });
   }
+
+  initFilesPage();
   
   document.getElementById('create-admin-form')?.addEventListener('submit', handleCreateAdmin);
   
@@ -283,6 +288,8 @@ function switchContent(page) {
     loadPolicies();
   } else if (page === 'products') {
     initProductsPage();
+  } else if (page === 'files') {
+    loadFiles();
   } else if (page === 'client-logs') {
     initClientLogsPage();
   } else if (page === 'swagger') {

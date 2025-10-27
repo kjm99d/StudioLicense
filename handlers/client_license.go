@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"studiolicense/database"
 	"studiolicense/logger"
@@ -48,12 +49,21 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 
 	// ?쇱씠?좎뒪 議고쉶
 	var license models.License
-	query := `SELECT id, license_key, product_name, customer_name, max_devices, 
+	var productID sql.NullString
+	var policyID sql.NullString
+	query := `SELECT id, license_key, product_id, policy_id, product_name, customer_name, max_devices, 
 		expires_at, status FROM licenses WHERE license_key = ?`
 
 	err := database.DB.QueryRow(query, req.LicenseKey).Scan(
-		&license.ID, &license.LicenseKey, &license.ProductName,
-		&license.CustomerName, &license.MaxDevices, &license.ExpiresAt, &license.Status,
+		&license.ID,
+		&license.LicenseKey,
+		&productID,
+		&policyID,
+		&license.ProductName,
+		&license.CustomerName,
+		&license.MaxDevices,
+		&license.ExpiresAt,
+		&license.Status,
 	)
 
 	if err == sql.ErrNoRows {
@@ -77,6 +87,16 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query license", err))
 		return
+	}
+
+	if productID.Valid {
+		license.ProductID = new(string)
+		*license.ProductID = productID.String
+	}
+
+	if policyID.Valid {
+		license.PolicyID = new(string)
+		*license.PolicyID = policyID.String
 	}
 
 	// ?쇱씠?좎뒪 ?좏슚??寃??
@@ -128,9 +148,12 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		}).Info("Device already activated")
 
 		json.NewEncoder(w).Encode(models.SuccessResponse("Device already activated", map[string]interface{}{
-			"license_key": license.LicenseKey,
-			"device_id":   existingID,
-			"expires_at":  license.ExpiresAt,
+			"license_key":   license.LicenseKey,
+			"device_id":     existingID,
+			"expires_at":    license.ExpiresAt,
+			"product_id":    stringValue(license.ProductID),
+			"policies":      loadPoliciesForLicense(license.PolicyID),
+			"product_files": loadProductFilesForProduct(license.ProductID),
 		}))
 		return
 	}
@@ -214,37 +237,19 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 	// ?쒕룞 濡쒓렇 湲곕줉
 	utils.LogDeviceActivity(deviceID, license.ID, models.DeviceActionActivated, "Device activated")
 
-	// ?뺤콉 ID 議고쉶 諛??뺤콉 ?뺣낫 媛?몄삤湲?
-	var policyID sql.NullString
-	policyIDQuery := "SELECT policy_id FROM licenses WHERE id = ?"
-	database.DB.QueryRow(policyIDQuery, license.ID).Scan(&policyID)
-
-	var policies []models.PolicyResponse
-	if policyID.Valid && policyID.String != "" {
-		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE id = ?`
-		rows, err := database.DB.Query(policyQuery, policyID.String)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var p models.PolicyResponse
-				var policyDataStr string
-				err := rows.Scan(&p.ID, &p.PolicyName, &policyDataStr)
-				if err == nil {
-					// JSON 臾몄옄?댁쓣 interface{}濡??뚯떛
-					json.Unmarshal([]byte(policyDataStr), &p.PolicyData)
-					policies = append(policies, p)
-				}
-			}
-		}
-	}
+	policies := loadPoliciesForLicense(license.PolicyID)
+	productFiles := loadProductFilesForProduct(license.ProductID)
+	productIDValue := stringValue(license.ProductID)
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(models.SuccessResponse("License activated successfully", map[string]interface{}{
-		"license_key":  license.LicenseKey,
-		"device_id":    deviceID,
-		"product_name": license.ProductName,
-		"expires_at":   license.ExpiresAt,
-		"policies":     policies,
+		"license_key":   license.LicenseKey,
+		"device_id":     deviceID,
+		"product_id":    productIDValue,
+		"product_name":  license.ProductName,
+		"expires_at":    license.ExpiresAt,
+		"policies":      policies,
+		"product_files": productFiles,
 	}))
 }
 
@@ -257,7 +262,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 // @Param request body models.ValidateRequest true "寃利??뺣낫"
 // @Success 200 {object} models.APIResponse "寃利??깃났"
 // @Failure 400 {object} models.APIResponse "?섎せ???붿껌"
-// @Failure 403 {object} models.APIResponse "?쇱씠?좎뒪 鍮꾪솢??留뚮즺 ?먮뒗 ?붾컮?댁뒪 誘몃벑濡?
+// @Failure 403 {object} models.APIResponse "?쇱씠?좎뒪 鍮꾪솢??留뚮즺 ?먮뒗 ?붾컮?댁뒪 誘몃벑濡?"
 // @Failure 404 {object} models.APIResponse "?쇱씠?좎뒪 ?놁쓬"
 // @Failure 500 {object} models.APIResponse "?쒕쾭 ?먮윭"
 // @Router /api/license/validate [post]
@@ -278,11 +283,18 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 
 	// ?쇱씠?좎뒪 議고쉶
 	var license models.License
-	query := `SELECT id, license_key, product_name, expires_at, status FROM licenses WHERE license_key = ?`
+	var productID sql.NullString
+	var policyID sql.NullString
+	query := `SELECT id, license_key, product_id, policy_id, product_name, expires_at, status FROM licenses WHERE license_key = ?`
 
 	err := database.DB.QueryRow(query, req.LicenseKey).Scan(
-		&license.ID, &license.LicenseKey, &license.ProductName,
-		&license.ExpiresAt, &license.Status,
+		&license.ID,
+		&license.LicenseKey,
+		&productID,
+		&policyID,
+		&license.ProductName,
+		&license.ExpiresAt,
+		&license.Status,
 	)
 
 	if err == sql.ErrNoRows {
@@ -295,6 +307,16 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query license", err))
 		return
+	}
+
+	if productID.Valid {
+		license.ProductID = new(string)
+		*license.ProductID = productID.String
+	}
+
+	if policyID.Valid {
+		license.PolicyID = new(string)
+		*license.PolicyID = policyID.String
 	}
 
 	// ?쇱씠?좎뒪 ?좏슚??寃??
@@ -341,35 +363,136 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 	updateQuery := "UPDATE device_activations SET last_validated_at = ? WHERE id = ?"
 	database.DB.Exec(updateQuery, time.Now().Format("2006-01-02 15:04:05"), deviceID)
 
-	// ?뺤콉 ID 議고쉶 諛??뺤콉 ?뺣낫 媛?몄삤湲?
-	var policyID sql.NullString
-	policyIDQuery := "SELECT policy_id FROM licenses WHERE id = ?"
-	database.DB.QueryRow(policyIDQuery, license.ID).Scan(&policyID)
-
-	var policies []models.PolicyResponse
-	if policyID.Valid && policyID.String != "" {
-		policyQuery := `SELECT id, policy_name, policy_data FROM policies WHERE id = ?`
-		rows, err := database.DB.Query(policyQuery, policyID.String)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var p models.PolicyResponse
-				var policyDataStr string
-				err := rows.Scan(&p.ID, &p.PolicyName, &policyDataStr)
-				if err == nil {
-					// JSON 臾몄옄?댁쓣 interface{}濡??뚯떛
-					json.Unmarshal([]byte(policyDataStr), &p.PolicyData)
-					policies = append(policies, p)
-				}
-			}
-		}
-	}
+	policies := loadPoliciesForLicense(license.PolicyID)
+	productFiles := loadProductFilesForProduct(license.ProductID)
+	productIDValue := stringValue(license.ProductID)
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("License is valid", map[string]interface{}{
-		"license_key":  license.LicenseKey,
-		"product_name": license.ProductName,
-		"expires_at":   license.ExpiresAt,
-		"valid":        true,
-		"policies":     policies,
+		"license_key":   license.LicenseKey,
+		"product_id":    productIDValue,
+		"product_name":  license.ProductName,
+		"expires_at":    license.ExpiresAt,
+		"valid":         true,
+		"policies":      policies,
+		"product_files": productFiles,
 	}))
+}
+
+func loadPoliciesForLicense(policyID *string) []models.PolicyResponse {
+	if policyID == nil || *policyID == "" {
+		return nil
+	}
+
+	query := `SELECT id, policy_name, policy_data FROM policies WHERE id = ?`
+	rows, err := database.DB.Query(query, *policyID)
+	if err != nil {
+		logger.WithFields(map[string]interface{}{
+			"policy_id": *policyID,
+			"error":     err.Error(),
+		}).Error("Failed to load policies for license")
+		return nil
+	}
+	defer rows.Close()
+
+	policies := []models.PolicyResponse{}
+	for rows.Next() {
+		var (
+			p             models.PolicyResponse
+			policyDataStr string
+		)
+		if err := rows.Scan(&p.ID, &p.PolicyName, &policyDataStr); err != nil {
+			logger.Warn("Failed to scan policy row: %v", err)
+			continue
+		}
+
+		if err := json.Unmarshal([]byte(policyDataStr), &p.PolicyData); err != nil {
+			logger.Warn("Failed to parse policy JSON: %v", err)
+			continue
+		}
+
+		policies = append(policies, p)
+	}
+
+	return policies
+}
+
+func loadProductFilesForProduct(productID *string) []models.ProductFileResponse {
+	if productID == nil || *productID == "" {
+		return nil
+	}
+
+	query := `SELECT pf.id, pf.file_id, pf.label, pf.description, pf.sort_order, pf.delivery_url, pf.updated_at,
+		f.mime_type, f.file_size, f.checksum, f.storage_path
+		FROM product_files pf
+		JOIN files f ON pf.file_id = f.id
+		WHERE pf.product_id = ? AND pf.is_active = 1
+		ORDER BY pf.sort_order ASC, pf.created_at DESC`
+
+	rows, err := database.DB.Query(query, *productID)
+	if err != nil {
+		logger.WithFields(map[string]interface{}{
+			"product_id": *productID,
+			"error":      err.Error(),
+		}).Error("Failed to load product files for product")
+		return nil
+	}
+	defer rows.Close()
+
+	files := []models.ProductFileResponse{}
+	for rows.Next() {
+		var (
+			item        models.ProductFileResponse
+			description sql.NullString
+			deliveryURL sql.NullString
+			checksum    sql.NullString
+		)
+
+		if err := rows.Scan(
+			&item.ID,
+			&item.FileID,
+			&item.Label,
+			&description,
+			&item.SortOrder,
+			&deliveryURL,
+			&item.UpdatedAt,
+			&item.MimeType,
+			&item.FileSize,
+			&checksum,
+			&item.StoragePath,
+		); err != nil {
+			logger.Warn("Failed to scan product file mapping: %v", err)
+			continue
+		}
+
+		if description.Valid {
+			item.Description = description.String
+		}
+
+		if deliveryURL.Valid {
+			item.DeliveryURL = deliveryURL.String
+		}
+
+		if checksum.Valid {
+			item.Checksum = checksum.String
+		}
+
+		downloadURL := fmt.Sprintf("/api/admin/files/%s?download=1", item.FileID)
+		if item.DeliveryURL != "" {
+			item.URL = item.DeliveryURL
+		} else {
+			item.URL = downloadURL
+		}
+		item.DownloadURL = downloadURL
+
+		files = append(files, item)
+	}
+
+	return files
+}
+
+func stringValue(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
 }
