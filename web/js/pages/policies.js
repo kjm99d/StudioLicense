@@ -2,8 +2,39 @@ import { state } from '../state.js';
 import { apiFetch, API_BASE_URL } from '../api.js';
 import { openModal, closeModal, showAlert, showConfirm } from '../modals.js';
 import { formatDateTime, escapeHtml } from '../utils.js';
+import { PolicyEditor } from '../components/policyEditor.js';
 
 let policies = [];
+let createPolicyEditor;
+let editPolicyEditor;
+
+function ensurePolicyEditor(type) {
+  if (type === 'create') {
+    if (!createPolicyEditor || !createPolicyEditor.rootEl?.isConnected) {
+      const root = document.querySelector('.policy-editor[data-policy-editor="create"]');
+      if (root) {
+        createPolicyEditor = new PolicyEditor(root);
+      } else {
+        createPolicyEditor = undefined;
+      }
+    }
+    return createPolicyEditor;
+  }
+
+  if (!editPolicyEditor || !editPolicyEditor.rootEl?.isConnected) {
+    const root = document.querySelector('.policy-editor[data-policy-editor="edit"]');
+    if (root) {
+      editPolicyEditor = new PolicyEditor(root);
+    } else {
+      editPolicyEditor = undefined;
+    }
+  }
+  return editPolicyEditor;
+}
+
+// Ensure editors are initialized once DOM is ready
+ensurePolicyEditor('create');
+ensurePolicyEditor('edit');
 
 export async function loadPolicies() {
   try {
@@ -77,25 +108,61 @@ export async function loadPolicies() {
 
 export function openCreatePolicyModal() {
   // 폼 리셋
-  document.getElementById('create-policy-form').reset();
+  const form = document.getElementById('create-policy-form');
+  if (form) form.reset();
+
+  const editor = ensurePolicyEditor('create');
+  if (editor) {
+    if (editor.getMode() === 'json') {
+      editor.setMode('form');
+    }
+    editor.resetFields();
+    editor.clearError();
+  } else {
+    const textarea = document.getElementById('policy_data');
+    if (textarea) textarea.value = '';
+  }
+
   openModal(document.getElementById('create-policy-modal'));
 }
 
 export async function handleCreatePolicy(e) {
   e.preventDefault();
   const policyName = document.getElementById('policy_name').value.trim();
-  const policyDataStr = document.getElementById('policy_data').value.trim();
-  
-  if (!policyName || !policyDataStr) {
+  let policyDataStr = '';
+
+  if (!policyName) {
     showAlert('모든 필드를 입력해주세요.');
     return;
   }
 
-  // JSON 유효성 검사
   try {
-    JSON.parse(policyDataStr);
+    const editor = ensurePolicyEditor('create');
+    if (editor) {
+      policyDataStr = editor.getJsonString();
+      editor.clearError();
+    } else {
+      const textarea = document.getElementById('policy_data');
+      const raw = textarea ? textarea.value.trim() : '';
+      if (!raw) {
+        showAlert('모든 필드를 입력해주세요.');
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      policyDataStr = JSON.stringify(parsed, null, 2);
+    }
   } catch (err) {
-    showAlert('정책 데이터가 유효한 JSON 형식이 아닙니다.');
+    const editor = ensurePolicyEditor('create');
+    if (editor) {
+      editor.displayError(err.message);
+    }
+    showAlert(err.message || '정책 데이터가 유효한 JSON 형식이 아닙니다.');
+    return;
+  }
+
+  policyDataStr = policyDataStr.trim();
+  if (!policyDataStr) {
+    showAlert('정책 데이터를 입력해주세요.');
     return;
   }
 
@@ -170,7 +237,43 @@ function openEditPolicyModal(policyId) {
   // 폼에 데이터 채우기
   document.getElementById('edit_policy_id').value = policy.id;
   document.getElementById('edit_policy_name').value = policy.policy_name;
-  document.getElementById('edit_policy_data').value = JSON.stringify(JSON.parse(policy.policy_data), null, 2);
+  let prettyPolicyData = policy.policy_data || '{}';
+  try {
+    const parsed = JSON.parse(policy.policy_data);
+    prettyPolicyData = JSON.stringify(parsed, null, 2);
+  } catch (err) {
+    // 그대로 사용 (폼 모드 변환 불가)
+  }
+
+  const editor = ensurePolicyEditor('edit');
+  if (editor) {
+    editor.clearError();
+    if (editor.getMode() === 'json') {
+      editor.setMode('form');
+    }
+
+    try {
+      editor.loadFromJson(prettyPolicyData);
+      if (editor.textarea) {
+        editor.textarea.value = prettyPolicyData;
+      }
+    } catch (err) {
+      // 폼 모드로 변환할 수 없으면 JSON 모드로 전환
+      editor.clearError();
+      editor.setMode('json');
+      if (editor.textarea) {
+        editor.textarea.value = prettyPolicyData;
+      }
+      setTimeout(() => {
+        showAlert('이 정책은 폼 모드로 변환할 수 없어 JSON 모드로 전환되었습니다.', '안내');
+      }, 100);
+    }
+  } else {
+    const editTextarea = document.getElementById('edit_policy_data');
+    if (editTextarea) {
+      editTextarea.value = prettyPolicyData;
+    }
+  }
 
   openModal(document.getElementById('edit-policy-modal'));
 }
@@ -179,18 +282,40 @@ export async function handleEditPolicy(e) {
   e.preventDefault();
   const policyId = document.getElementById('edit_policy_id').value;
   const policyName = document.getElementById('edit_policy_name').value.trim();
-  const policyDataStr = document.getElementById('edit_policy_data').value.trim();
+  let policyDataStr = '';
 
-  if (!policyName || !policyDataStr) {
+  if (!policyName) {
     showAlert('모든 필드를 입력해주세요.');
     return;
   }
 
-  // JSON 유효성 검사
   try {
-    JSON.parse(policyDataStr);
+    const editor = ensurePolicyEditor('edit');
+    if (editor) {
+      policyDataStr = editor.getJsonString();
+      editor.clearError();
+    } else {
+      const textarea = document.getElementById('edit_policy_data');
+      const raw = textarea ? textarea.value.trim() : '';
+      if (!raw) {
+        showAlert('모든 필드를 입력해주세요.');
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      policyDataStr = JSON.stringify(parsed, null, 2);
+    }
   } catch (err) {
-    showAlert('정책 데이터가 유효한 JSON 형식이 아닙니다.');
+    const editor = ensurePolicyEditor('edit');
+    if (editor) {
+      editor.displayError(err.message);
+    }
+    showAlert(err.message || '정책 데이터가 유효한 JSON 형식이 아닙니다.');
+    return;
+  }
+
+  policyDataStr = policyDataStr.trim();
+  if (!policyDataStr) {
+    showAlert('정책 데이터를 입력해주세요.');
     return;
   }
 

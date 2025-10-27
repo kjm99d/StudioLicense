@@ -789,9 +789,22 @@
                     <input type="text" id="policy_name" name="policy_name" placeholder="예: 프리미엄 정책" required>
                 </div>
                 <div class="form-group">
-                    <label for="policy_data">정책 데이터 (JSON) *</label>
-                    <textarea id="policy_data" name="policy_data" rows="10" placeholder='{"feature": "enabled"}' style="font-family: monospace;" required></textarea>
-                    <small style="color: #6b7280;">유효한 JSON 형식으로 입력해주세요.</small>
+                    <label for="policy_data">정책 데이터 *</label>
+                    <div class="policy-editor" data-policy-editor="create" data-initial-mode="form">
+                        <div class="editor-mode-toggle" role="group" aria-label="입력 방식 선택">
+                            <button type="button" class="btn btn-small editor-mode-btn active" data-mode="form">폼 입력</button>
+                            <button type="button" class="btn btn-small grey lighten-2 editor-mode-btn" data-mode="json">JSON 직접 입력</button>
+                        </div>
+                        <div class="policy-editor-form" id="create_policy_editor_form">
+                            <div class="policy-field-list" id="create_policy_field_list"></div>
+                            <button type="button" class="btn btn-small blue lighten-1 add-policy-field-btn" data-action="add-field">필드 추가</button>
+                            <small style="display:block;margin-top:8px;color:#6b7280;">키-값 쌍을 입력하면 저장 시 JSON으로 변환됩니다.</small>
+                        </div>
+                        <div class="policy-editor-json" id="create_policy_editor_json" hidden>
+                            <textarea id="policy_data" name="policy_data" rows="10" placeholder='{"feature": "enabled"}' style="font-family: monospace;"></textarea>
+                            <small style="color: #6b7280;">유효한 JSON 형식으로 입력해주세요.</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn grey darken-1 modal-close">취소</button>
@@ -819,9 +832,22 @@
                     <input type="text" id="edit_policy_name" name="policy_name" required>
                 </div>
                 <div class="form-group">
-                    <label for="edit_policy_data">정책 데이터 (JSON) *</label>
-                    <textarea id="edit_policy_data" name="policy_data" rows="12" style="font-family: monospace;" required></textarea>
-                    <small style="color: #6b7280;">유효한 JSON 형식으로 입력해주세요.</small>
+                    <label for="edit_policy_data">정책 데이터 *</label>
+                    <div class="policy-editor" data-policy-editor="edit" data-initial-mode="form">
+                        <div class="editor-mode-toggle" role="group" aria-label="입력 방식 선택">
+                            <button type="button" class="btn btn-small editor-mode-btn active" data-mode="form">폼 입력</button>
+                            <button type="button" class="btn btn-small grey lighten-2 editor-mode-btn" data-mode="json">JSON 직접 입력</button>
+                        </div>
+                        <div class="policy-editor-form" id="edit_policy_editor_form">
+                            <div class="policy-field-list" id="edit_policy_field_list"></div>
+                            <button type="button" class="btn btn-small blue lighten-1 add-policy-field-btn" data-action="add-field">필드 추가</button>
+                            <small style="display:block;margin-top:8px;color:#6b7280;">키-값 쌍을 입력하면 저장 시 JSON으로 변환됩니다.</small>
+                        </div>
+                        <div class="policy-editor-json" id="edit_policy_editor_json" hidden>
+                            <textarea id="edit_policy_data" name="policy_data" rows="12" style="font-family: monospace;"></textarea>
+                            <small style="color: #6b7280;">유효한 JSON 형식으로 입력해주세요.</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn grey darken-1 modal-close">취소</button>

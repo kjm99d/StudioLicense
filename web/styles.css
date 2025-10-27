@@ -1120,6 +1120,30 @@ table .btn {
     color: var(--secondary-color);
 }
 
+.policy-editor {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 16px;
+    background: #f9fafb;
+}
+
+.policy-editor .editor-mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.policy-editor .policy-field-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.policy-editor .policy-field-row textarea {
+    min-height: 38px;
+}
+
 .policy-meta {
     font-size: 0.875rem;
     color: var(--secondary-color);
