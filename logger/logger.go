@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// LogLevel 로그 레벨
+// LogLevel represents the severity of a log message.
 type LogLevel int
 
 const (
@@ -43,7 +43,7 @@ var (
 	resetColor = "\033[0m"
 )
 
-// Logger 구조화된 로거
+// Logger is a simple structured logger that writes to multiple destinations.
 type Logger struct {
 	level      LogLevel
 	writers    []io.Writer
@@ -58,7 +58,7 @@ var (
 	once          sync.Once
 )
 
-// Config 로거 설정
+// Config describes how the logger should be initialised.
 type Config struct {
 	Level      LogLevel
 	LogDir     string
@@ -69,7 +69,7 @@ type Config struct {
 	Prefix     string
 }
 
-// Initialize 로거 초기화
+// Initialize boots the global logger instance if it has not been created yet.
 func Initialize(config Config) error {
 	var err error
 	once.Do(func() {
@@ -81,16 +81,16 @@ func Initialize(config Config) error {
 			showCaller: config.ShowCaller,
 		}
 
-		// 콘솔 출력 추가
+		// Append console writer with optional ANSI colours.
 		defaultLogger.writers = append(defaultLogger.writers, os.Stdout)
 
-		// 로그 디렉토리 생성
+		// Build the log directory when provided.
 		if config.LogDir != "" {
 			if err = os.MkdirAll(config.LogDir, 0755); err != nil {
 				return
 			}
 
-			// 로그 파일 생성
+			// Open the log file for the current day.
 			logFile, fileErr := createLogFile(config.LogDir)
 			if fileErr != nil {
 				err = fileErr
@@ -99,7 +99,7 @@ func Initialize(config Config) error {
 
 			defaultLogger.writers = append(defaultLogger.writers, logFile)
 
-			// 로그 rotation 고루틴 시작
+			// Spawn rotation worker.
 			go rotateLogFiles(config.LogDir, config.MaxSize, config.MaxAge)
 		}
 	})
@@ -107,7 +107,7 @@ func Initialize(config Config) error {
 	return err
 }
 
-// createLogFile 로그 파일 생성
+// createLogFile creates (or opens) the log file for the current day.
 func createLogFile(logDir string) (*os.File, error) {
 	timestamp := time.Now().Format("2006-01-02")
 	logPath := filepath.Join(logDir, fmt.Sprintf("server-%s.log", timestamp))
@@ -120,13 +120,13 @@ func createLogFile(logDir string) (*os.File, error) {
 	return file, nil
 }
 
-// rotateLogFiles 로그 파일 rotation
+// rotateLogFiles periodically rotates and prunes log files.
 func rotateLogFiles(logDir string, maxSize int64, maxAge int) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// 오래된 로그 파일 삭제
+		// Clean up historic log files.
 		files, _ := filepath.Glob(filepath.Join(logDir, "server-*.log"))
 		for _, file := range files {
 			info, err := os.Stat(file)
@@ -134,15 +134,15 @@ func rotateLogFiles(logDir string, maxSize int64, maxAge int) {
 				continue
 			}
 
-			// 파일 나이 체크
+			// Remove files older than retention.
 			if time.Since(info.ModTime()).Hours() > float64(maxAge*24) {
 				os.Remove(file)
 				continue
 			}
 
-			// 파일 크기 체크
+			// Rotate when the file exceeds the maximum size.
 			if maxSize > 0 && info.Size() > maxSize {
-				// 파일 이름 변경 (압축 또는 아카이브)
+				// Rename the current file for archiving.
 				newName := strings.Replace(file, ".log", fmt.Sprintf("-%d.log", time.Now().Unix()), 1)
 				os.Rename(file, newName)
 			}
@@ -150,7 +150,7 @@ func rotateLogFiles(logDir string, maxSize int64, maxAge int) {
 	}
 }
 
-// log 내부 로깅 함수
+// log writes the formatted entry to the underlying logger.
 func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	if level < l.level {
 		return
@@ -163,7 +163,7 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	levelName := levelNames[level]
 	message := fmt.Sprintf(format, args...)
 
-	// 호출자 정보
+	// Reset colours for non-console writers.
 	caller := ""
 	if l.showCaller {
 		_, file, line, ok := runtime.Caller(2)
@@ -173,10 +173,10 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 		}
 	}
 
-	// 로그 메시지 구성
+	// 濡쒓렇 硫붿떆吏 援ъ꽦
 	var logMessage string
 	for i, writer := range l.writers {
-		if i == 0 && l.useColor { // 콘솔에만 컬러 적용
+		if i == 0 && l.useColor { // Apply colour only to stdout.
 			color := levelColors[level]
 			logMessage = fmt.Sprintf("%s%s [%s]%s %s%s%s\n",
 				timestamp, caller, levelName, l.prefix, color, message, resetColor)
@@ -188,13 +188,13 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 		writer.Write([]byte(logMessage))
 	}
 
-	// FATAL 레벨은 프로그램 종료
+	// Exit process on fatal level.
 	if level == FATAL {
 		os.Exit(1)
 	}
 }
 
-// Public 로깅 함수들
+// Public helper methods for the default logger.
 func Debug(format string, args ...interface{}) {
 	if defaultLogger != nil {
 		defaultLogger.log(DEBUG, format, args...)
@@ -233,7 +233,7 @@ func Fatal(format string, args ...interface{}) {
 	}
 }
 
-// WithFields 구조화된 로깅을 위한 필드 추가
+// WithFields attaches structured fields to the log entry.
 func WithFields(fields map[string]interface{}) *LogEntry {
 	return &LogEntry{
 		fields: fields,
@@ -241,7 +241,7 @@ func WithFields(fields map[string]interface{}) *LogEntry {
 	}
 }
 
-// LogEntry 구조화된 로그 엔트리
+// LogEntry represents a structured log entry builder.
 type LogEntry struct {
 	fields map[string]interface{}
 	logger *Logger
@@ -274,7 +274,7 @@ func (e *LogEntry) log(level LogLevel, format string, args ...interface{}) {
 
 	message := fmt.Sprintf(format, args...)
 
-	// 필드를 메시지에 추가
+	// Attach formatted fields to the log message.
 	if len(e.fields) > 0 {
 		var fieldStrs []string
 		for k, v := range e.fields {
@@ -283,15 +283,15 @@ func (e *LogEntry) log(level LogLevel, format string, args ...interface{}) {
 		message = fmt.Sprintf("%s | %s", message, strings.Join(fieldStrs, ", "))
 	}
 
-	e.logger.log(level, message)
+	e.logger.log(level, "%s", message)
 }
 
-// Log public 로그 메서드 (외부 호출용)
+// Log allows emitting a message with an explicit level via the entry.
 func (e *LogEntry) Log(level LogLevel, format string, args ...interface{}) {
 	e.log(level, format, args...)
 }
 
-// SetLevel 로그 레벨 변경
+// SetLevel updates the global logging level.
 func SetLevel(level LogLevel) {
 	if defaultLogger != nil {
 		defaultLogger.mu.Lock()
@@ -300,7 +300,7 @@ func SetLevel(level LogLevel) {
 	}
 }
 
-// GetLevel 현재 로그 레벨 반환
+// GetLevel returns the current global logging level.
 func GetLevel() LogLevel {
 	if defaultLogger != nil {
 		return defaultLogger.level

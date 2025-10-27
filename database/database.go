@@ -65,8 +65,8 @@ func createTables() error {
 			password VARCHAR(255) NOT NULL,
 			email VARCHAR(100) NOT NULL,
 			role VARCHAR(50) NOT NULL DEFAULT 'admin',
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
-			updated_at VARCHAR(50) NOT NULL DEFAULT ''
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 제품 테이블
@@ -75,8 +75,8 @@ func createTables() error {
 			name VARCHAR(255) UNIQUE NOT NULL,
 			description TEXT,
 			status VARCHAR(50) NOT NULL DEFAULT 'active',
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
-			updated_at VARCHAR(50) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			INDEX idx_products_status (status)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
@@ -85,8 +85,8 @@ func createTables() error {
 			id VARCHAR(50) PRIMARY KEY,
 			policy_name VARCHAR(255) UNIQUE NOT NULL,
 			policy_data LONGTEXT NOT NULL,
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
-			updated_at VARCHAR(50) NOT NULL DEFAULT ''
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 라이선스 테이블
@@ -99,11 +99,11 @@ func createTables() error {
 			customer_name VARCHAR(255) NOT NULL,
 			customer_email VARCHAR(100) NOT NULL,
 			max_devices INT NOT NULL DEFAULT 1,
-			expires_at VARCHAR(50) NOT NULL DEFAULT '',
+			expires_at DATETIME NOT NULL,
 			status VARCHAR(50) NOT NULL DEFAULT 'active',
 			notes TEXT,
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
-			updated_at VARCHAR(50) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
 			FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE SET NULL,
 			INDEX idx_licenses_key (license_key),
@@ -120,9 +120,9 @@ func createTables() error {
 			device_info LONGTEXT NOT NULL,
 			device_name VARCHAR(255),
 			status VARCHAR(50) NOT NULL DEFAULT 'active',
-			activated_at VARCHAR(50) NOT NULL DEFAULT '',
-			last_validated_at VARCHAR(50) NOT NULL DEFAULT '',
-			deactivated_at VARCHAR(50),
+			activated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_validated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			deactivated_at DATETIME NULL,
 			FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE,
 			UNIQUE KEY unique_device (license_id, device_fingerprint),
 			INDEX idx_devices_license (license_id),
@@ -137,7 +137,7 @@ func createTables() error {
 			license_id VARCHAR(50) NOT NULL,
 			action VARCHAR(100) NOT NULL,
 			details LONGTEXT,
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (device_id) REFERENCES device_activations(id) ON DELETE CASCADE,
 			FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE,
 			INDEX idx_device (device_id),
@@ -152,7 +152,7 @@ func createTables() error {
 			username VARCHAR(100) NOT NULL,
 			action VARCHAR(100) NOT NULL,
 			details LONGTEXT,
-			created_at VARCHAR(50) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			INDEX idx_admin (admin_id),
 			INDEX idx_created (created_at)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
@@ -167,17 +167,17 @@ func createTables() error {
 			message TEXT NOT NULL,
 			details LONGTEXT,
 			stack_trace LONGTEXT,
-		app_version VARCHAR(50),
-		os_version VARCHAR(100),
-		client_ip VARCHAR(50),
-		client_timestamp VARCHAR(50),
-		created_at VARCHAR(50) NOT NULL DEFAULT '',
-		INDEX idx_license_key (license_key),
-		INDEX idx_device_id (device_id),
-		INDEX idx_level (level),
-		INDEX idx_category (category),
-		INDEX idx_created (created_at)
-	) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+			app_version VARCHAR(50),
+			os_version VARCHAR(100),
+			client_ip VARCHAR(50),
+			client_timestamp DATETIME,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_license_key (license_key),
+			INDEX idx_device_id (device_id),
+			INDEX idx_level (level),
+			INDEX idx_category (category),
+			INDEX idx_created (created_at)
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 	}
 
 	// MySQL 테이블 생성

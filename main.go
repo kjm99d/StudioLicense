@@ -59,7 +59,7 @@ func main() {
 
 	// 데이터베이스 초기화 (MySQL 전용)
 	// DSN 형식: "user:password@tcp(host:port)/dbname"
-	mysqlDSN := "root:root@tcp(localhost:3306)/studiolicense"
+	mysqlDSN := "root:root@tcp(localhost:3306)/studiolicense?parseTime=true&loc=Asia%2FSeoul"
 	if err := database.Initialize(mysqlDSN); err != nil {
 		logger.Fatal("Failed to initialize database: %v", err)
 	}

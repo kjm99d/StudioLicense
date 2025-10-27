@@ -1,617 +1,146 @@
 # Studio License Server
 
-디바이스 하드웨어 기반 라이선스 관리 서버입니다.
+스튜디오 라이선스 서버는 소프트웨어 라이선스를 손쉽게 발급·관리하기 위한 Go 기반 백엔드와 현대적인 웹 대시보드를 제공하는 프로젝트입니다.  
+Productos, 정책, 디바이스, 관리자에 대한 CRUD와 감사 로그, Swagger 기반의 REST API 문서를 포함하고 있습니다.
+
+---
 
 ## 주요 기능
 
-### 👥 관리자 시스템
-- **Super Admin & Sub Admin 계층 구조**
-- Sub Admin 관리 (생성, 비밀번호 초기화, 삭제)
-- 역할 기반 접근 제어 (RBAC)
-- 비밀번호 변경 기능
+### 관리자 기능
+- Super Admin / Admin 계층 구조와 RBAC(Role-Based Access Control)
+- 서브 관리자 생성·비활성화·비밀번호 초기화
+- 모든 관리자 활동에 대한 세부 로그 기록
 
-### 🎫 라이선스 관리
-- 라이선스 생성, 조회, 수정, 삭제
-- 제품별 라이선스 발급
-- **정책 기반 라이선스 제어**
-- 라이선스 상태 관리 (활성/만료/폐기)
-- 최대 디바이스 수 제한
-- 만료일 관리
+### 라이선스 관리
+- 라이선스 생성 / 조회 / 수정 / 삭제 / 폐기
+- 제품·정책과 연계된 라이선스 발급
+- 상태(활성, 만료, 폐기) 및 디바이스 할당량 실시간 추적
+- 스케줄러를 통한 만료 라이선스 자동 처리
 
-### 🛡️ 정책 관리 (Policy System)
-- **제품과 독립적인 정책 시스템**
-- 정책 생성, 수정, 삭제
-- JSON 형식의 유연한 정책 데이터
-- 정책 활성/비활성 상태 관리
-- 라이선스에 정책 할당 및 변경
-- 정책 삭제 시 라이선스 정책 변경 가능
+### 정책 관리
+- JSON 기반 정책 정의 및 버전 관리
+- 정책 CRUD 및 라이선스와의 매핑
+- 정책 변경에 대한 감사 로그 자동 기록
 
-### 📦 제품 관리
-- 제품 CRUD 기능
-- 제품별 상태 관리
-- 제품별 라이선스 통계
+### 디바이스 관리
+- 하드웨어 지문을 이용한 디바이스 활성화
+- 디바이스 비활성화/재활성화 API 제공
+- 디바이스 활동 로그 및 청소(Cleanup) 작업
 
-### 🖥️ 디바이스 관리
-- 하드웨어 핑거프린트 기반 디바이스 인증
-- 디바이스 활성화/비활성화/재활성화
-- **실시간 디바이스 슬롯 추적** (남은 슬롯/최대 슬롯)
-- 디바이스별 활동 로그
-- **비활성 디바이스 정리** (0일부터 설정 가능)
-- 디바이스 상세 정보 표시 (Client ID, Hostname, OS 등)
+### 로깅 · 관측성
+- 라이선스·디바이스 지표 요약 대시보드
+- 관리자/디바이스 활동 로그
+- 클라이언트 애플리케이션 로그 수집 엔드포인트
+- 다중 출력 및 로테이션을 지원하는 구조화 로거
 
-### 📊 대시보드 & 로깅
-- 실시간 통계 (라이선스, 디바이스)
-- 관리자 활동 로그
-- 디바이스 활동 로그
-- **클라이언트 로그 시스템** (신규)
-  - 클라이언트 애플리케이션 로그 수집
-  - 로그 레벨별 필터링 (DEBUG, INFO, WARN, ERROR, FATAL)
-  - 카테고리별 분류
-  - 스택 트레이스 기록
-  - 날짜 기반 로그 정리 기능
-- 필터링 및 검색 기능
+---
 
-## 요구사항
+## 요구 사항
 
 - Go 1.21 이상
 - MySQL 8.0 이상
+- ES6 모듈을 지원하는 최신 브라우저 (관리자 대시보드용)
 
-## 데이터베이스 셋업
+---
 
-### MySQL 설정
+## 디렉터리 구조
 
-```bash
-# MySQL에서 데이터베이스 생성
-mysql -u root -p -e "CREATE DATABASE studiolicense CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+├── database/           # DB 초기화 및 헬퍼
+├── handlers/           # REST API 핸들러
+├── logger/             # 구조화 로거 및 로테이션
+├── middleware/         # 인증/권한/로깅 미들웨어
+├── models/             # DTO 및 상수 정의
+├── scheduler/          # 백그라운드 작업 (만료 체크)
+├── utils/              # 공용 유틸리티 (암호화, 시간 등)
+├── web/                # 웹 대시보드 (index.html, JS 모듈)
+└── docs/               # Swagger 문서
 ```
 
-```go
-// main.go (기본 설정)
-database.Initialize("root:root@tcp(localhost:3306)/studiolicense")
-```
+---
 
-### 자동 테이블 생성
+## 로컬 개발 환경 준비
 
-Go 서버를 실행하면 다음 테이블들이 **자동으로 생성**됩니다:
-
-- **admins** - 관리자 계정 (ID, 비밀번호, 역할)
-- **products** - 제품 정보
-- **policies** - 정책 정보
-- **licenses** - 라이선스 키 및 활성화 정보 (정책 ID 포함)
-- **device_activations** - 디바이스별 활성화 기록
-- **admin_activity_logs** - 관리자 작업 로그
-- **device_activity_logs** - 디바이스 접근 로그
-- **client_logs** - 클라이언트 애플리케이션 로그 (신규)
-
-> **별도의 마이그레이션 작업은 필요 없습니다.** 데이터베이스만 생성하면 나머지는 모두 자동으로 처리됩니다.
-
-## 설치 및 실행
-
-### 1단계: 프로젝트 클론
-```bash
-git clone https://github.com/kjm99d/StudioLicense.git
+### 1. 저장소 클론
+```powershell
+git clone https://github.com/your-org/StudioLicense.git
 cd StudioLicense
 ```
 
-### 2단계: 의존성 설치
-```bash
+### 2. PowerShell UTF-8 설정 (권장)
+Windows PowerShell에서는 한글이 깨지는 것을 방지하기 위해 세션 시작 시 아래 명령을 실행하세요.
+
+```powershell
+chcp 65001 > $null
+$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
+$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+```
+
+### 3. 의존성 설치
+```powershell
 go mod tidy
 ```
 
-### 3단계: 서버 실행
-```bash
+### 4. 데이터베이스 설정
+- `studiolicense` 데이터베이스를 MySQL에 생성합니다.
+- 필요 시 `main.go`의 DSN을 환경에 맞게 수정하세요.
+  ```
+  root:root@tcp(localhost:3306)/studiolicense?parseTime=true&loc=Asia%2FSeoul
+  ```
+- 첫 실행 시 테이블과 기본 Super Admin(`admin` / `admin123`) 계정이 자동으로 생성됩니다.
+
+### 5. 서버 실행
+```powershell
 go run main.go
 ```
 
-> 서버 시작 시 다음이 **자동으로 실행됩니다:**
-> - ✅ 테이블 생성 (CREATE TABLE IF NOT EXISTS)
-> - ✅ 기본 관리자 계정 생성 (admin / admin123) - 첫 실행 시에만
-> - ✅ 샘플 제품 생성 - 첫 실행 시에만
-> - ✅ 만료된 라이선스 자동 체크 (매일 00:00)
+관리자 대시보드: **http://localhost:8080/web/**  
+API 문서(Swagger): **http://localhost:8080/swagger/index.html**
 
-### 4단계: 웹 접속
-```
-http://localhost:8080/web/
-```
+---
 
-**기본 관리자 계정:**
-- Username: `admin`
-- Password: `admin123`
+## 테스트 실행
 
-> ⚠️ **첫 로그인 후 반드시 비밀번호를 변경하세요!**
-
-## 관리자 역할
-
-### Super Admin (최고 관리자)
-- ✅ 모든 관리 기능 접근
-- ✅ Sub Admin 생성, 수정, 삭제
-- ✅ 디바이스 정리 기능
-- ✅ 모든 활동 로그 조회
-
-### Admin (일반 관리자)
-- ✅ 라이선스 관리
-- ✅ 제품 관리
-- ✅ 정책 관리
-- ✅ 디바이스 조회 및 관리
-- ✅ 대시보드 조회
-- ❌ Sub Admin 관리 불가
-- ❌ 디바이스 정리 불가
-
-## 정책 시스템 (Policy System)
-
-### 정책이란?
-
-정책은 라이선스에 적용할 수 있는 규칙이나 설정을 JSON 형식으로 정의한 것입니다.
-
-### 정책 예시
-
-```json
-{
-  "feature": "premium",
-  "max_projects": 100,
-  "export_formats": ["mp4", "avi", "mov"],
-  "cloud_storage": true
-}
+```powershell
+go test ./...
 ```
 
-### 정책 관리
+---
 
-1. **정책 생성**: 정책명과 JSON 데이터로 정책 생성
-2. **정책 수정**: 정책 데이터 및 상태(활성/비활성) 수정
-3. **정책 삭제**: 정책 삭제 (연결된 라이선스는 정책 없음으로 변경)
-4. **라이선스에 적용**: 라이선스 생성 시 또는 수정 시 정책 선택
+## 로그 · 타임존
 
-### 라이선스-정책 관계
+- 모든 일시는 Asia/Seoul 타임존을 기준으로 `DATETIME` 컬럼에 저장됩니다.
+- `utils/time.go`에서 시간 파싱/포맷을 일원화하고 있습니다.
+- 로그는 콘솔과 `/logs/server-YYYY-MM-DD.log` 파일에 동시 기록되며, 로테이션 및 보관 기간은 `logger.Config`로 조정 가능합니다.
 
-- 라이선스는 **선택적으로** 하나의 정책을 가질 수 있음
-- 정책 없이도 라이선스 발급 가능
-- 라이선스 수정 시 정책 변경 가능
-- 정책 삭제 시 해당 정책을 사용하는 라이선스의 정책을 변경 필요
+---
 
-## 디바이스 핑거프린트 시스템
+## API 추가 가이드
 
-### 디바이스 식별 방법
+1. `models/`에 데이터 모델 정의
+2. `handlers/`에 비즈니스 로직 및 핸들러 작성
+3. `main.go`에 라우팅 등록
+4. Swagger 주석(`@Summary`, `@Description` 등) 추가
 
-디바이스는 하드웨어 정보를 조합한 **핑거프린트**로 식별됩니다.
+## 웹 대시보드 확장
 
-### 핑거프린트 구성 요소
+1. `web/js/pages/`에 새로운 페이지 모듈 추가
+2. `web/index.html`에 필요한 구조물/모달 추가
+3. `web/js/main.js`에서 모듈을 import 및 초기화
+4. 필요에 따라 공통 유틸/컴포넌트 확장
 
-```
-SHA256(client_id|cpu_id|motherboard_sn|mac_address|disk_serial|machine_id)
-```
+---
 
-- **Client ID**: 클라이언트 애플리케이션에서 생성한 고유 ID
-- **CPU ID**: CPU 제조사 및 모델 정보
-- **Motherboard SN**: 메인보드 시리얼 번호
-- **MAC Address**: 네트워크 인터페이스 MAC 주소
-- **Disk Serial**: 디스크 시리얼 번호
-- **Machine ID**: 운영체제 머신 ID
+## 기여 방법
 
-> ⚠️ **주의**: Hostname은 핑거프린트에 포함되지 않습니다. (변경 가능하므로)
+1. 저장소를 포크하고 브랜치를 생성합니다.  
+   `git checkout -b feature/awesome-feature`
+2. 변경 사항을 커밋합니다.  
+   `git commit -m "Add awesome feature"`
+3. 테스트를 실행합니다.  
+   `go test ./...`
+4. 포크한 저장소에 푸시 후 Pull Request를 생성합니다.
 
-### 디바이스 활성화 프로세스
-
-1. 클라이언트가 하드웨어 정보를 수집
-2. 서버로 라이선스 키와 함께 전송
-3. 서버가 핑거프린트 생성 및 저장
-4. 최대 디바이스 수 확인
-5. 슬롯이 남아있으면 활성화 성공
-
-### 디바이스 검증 프로세스
-
-1. 클라이언트가 라이선스 키와 핑거프린트 전송
-2. 서버가 핑거프린트 일치 여부 확인
-3. 라이선스 만료 여부 확인
-4. 디바이스 활성 상태 확인
-5. 모두 통과하면 검증 성공
-
-### 디바이스 슬롯 관리
-
-**예시 시나리오:**
-- 라이선스 최대 디바이스: 30개
-- 현재 활성 디바이스: 27개
-- 표시: `3/30` (남은 슬롯 3개)
-
-**디바이스 비활성화 시:**
-- 활성 디바이스: 27 → 26개
-- 표시: `4/30` (남은 슬롯 4개)
-- 즉시 새로운 디바이스 등록 가능
-
-**디바이스 재활성화 시:**
-- 활성 디바이스: 26 → 27개
-- 표시: `3/30` (남은 슬롯 3개)
-- 슬롯이 남아있어야 재활성화 가능
-
-**최대 디바이스 수 변경 제한:**
-- 현재 27개 활성 → 최대 30개는 가능
-- 현재 27개 활성 → 최대 25개는 **불가능**
-- 오류: "Cannot reduce max devices to 25. Currently 27 devices are active."
-
-## API 엔드포인트
-
-### 관리자 인증 API
-- `POST /api/admin/login` - 로그인
-- `POST /api/admin/change-password` - 비밀번호 변경
-- `GET /api/admin/me` - 현재 관리자 정보
-
-### 관리자 관리 API (Super Admin 전용)
-- `GET /api/admin/admins` - Sub Admin 목록
-- `POST /api/admin/admins/create` - Sub Admin 생성
-- `POST /api/admin/admins/:id/reset-password` - 비밀번호 초기화
-- `DELETE /api/admin/admins/:id` - Sub Admin 삭제
-
-### 라이선스 관리 API
-- `GET /api/admin/licenses` - 라이선스 목록 (페이징, 필터링)
-- `GET /api/admin/licenses?id={id}` - 라이선스 상세
-- `POST /api/admin/licenses` - 라이선스 생성
-- `PUT /api/admin/licenses?id={id}` - 라이선스 수정
-- `DELETE /api/admin/licenses?id={id}` - 라이선스 삭제
-- `GET /api/admin/licenses/devices?id={id}` - 라이선스 디바이스 목록
-
-### 정책 관리 API
-- `GET /api/admin/policies` - 정책 목록
-- `GET /api/admin/policies/:id` - 정책 상세
-- `POST /api/admin/policies` - 정책 생성
-- `PUT /api/admin/policies/:id` - 정책 수정
-- `DELETE /api/admin/policies/:id` - 정책 삭제
-
-### 제품 관리 API
-- `GET /api/admin/products` - 제품 목록
-- `POST /api/admin/products` - 제품 생성
-- `PUT /api/admin/products/:id` - 제품 수정
-- `DELETE /api/admin/products/:id` - 제품 삭제
-
-### 디바이스 관리 API
-- `POST /api/admin/devices/deactivate` - 디바이스 비활성화
-- `POST /api/admin/devices/reactivate` - 디바이스 재활성화
-- `POST /api/admin/devices/cleanup` - 비활성 디바이스 정리 (0일 이상)
-- `GET /api/admin/devices/logs?device_id={id}` - 디바이스 활동 로그
-
-### 대시보드 API
-- `GET /api/admin/dashboard/stats` - 통계 조회
-- `GET /api/admin/dashboard/activities` - 활동 로그 조회
-
-### 클라이언트 로그 API
-- `POST /api/client/logs` - 클라이언트 로그 전송 (인증 불필요)
-- `GET /api/admin/client-logs` - 로그 조회 (페이징, 필터링)
-- `DELETE /api/admin/client-logs/cleanup` - 날짜 기반 로그 정리
-
-### 클라이언트 API (인증 불필요)
-- `POST /api/license/activate` - 라이선스 활성화
-- `POST /api/license/validate` - 라이선스 검증
-
-> 📚 상세한 API 문서는 `http://localhost:8080/swagger/` 에서 확인 가능
-
-## 프로젝트 구조
-
-```
-StudioLicense/
-├── main.go                    # 서버 진입점 및 라우팅
-├── go.mod                     # Go 모듈 정의
-├── go.sum                     # 의존성 체크섬
-│
-├── database/
-│   └── database.go            # DB 초기화 및 스키마 생성
-│
-├── models/                    # 데이터 모델
-│   ├── admin.go               # 관리자 모델
-│   ├── admin_activity.go      # 관리자 활동 로그
-│   ├── device.go              # 디바이스 모델
-│   ├── device_log.go          # 디바이스 활동 로그
-│   ├── license.go             # 라이선스 모델
-│   ├── product.go             # 제품 모델
-│   └── response.go            # API 응답 구조
-│
-├── handlers/                  # API 핸들러
-│   ├── admin_device.go        # 디바이스 관리
-│   ├── admin_license.go       # 라이선스 관리
-│   ├── admin_user.go          # Sub Admin 관리
-│   ├── auth.go                # 인증
-│   ├── client_license.go      # 클라이언트 라이선스 API
-│   ├── dashboard.go           # 대시보드
-│   └── product.go             # 제품 관리
-│
-├── middleware/                # 미들웨어
-│   ├── logging.go             # 요청/응답 로깅
-│   └── roles.go               # 역할 기반 접근 제어
-│
-├── utils/                     # 유틸리티
-│   ├── admin_log.go           # 관리자 활동 로깅
-│   ├── crypto.go              # 암호화 (bcrypt, hash)
-│   ├── device_log.go          # 디바이스 활동 로깅
-│   └── jwt.go                 # JWT 토큰 생성/검증
-│
-├── scheduler/                 # 스케줄러
-│   └── scheduler.go           # 크론 작업 (만료 체크 등)
-│
-├── logger/                    # 로거
-│   └── logger.go              # 구조화된 로깅
-│
-├── web/                       # 프론트엔드 (Modern ES6 Modules)
-│   ├── index.html             # 메인 HTML
-│   ├── styles.css             # 전역 스타일
-│   └── js/                    # 모듈화된 JavaScript
-│       ├── api.js             # API 호출 래퍼
-│       ├── main.js            # 앱 진입점 및 라우팅
-│       ├── modals.js          # 모달 시스템 (z-index 관리)
-│       ├── state.js           # 전역 상태 관리
-│       ├── ui.js              # UI 컴포넌트
-│       ├── utils.js           # 유틸리티 함수
-│       └── pages/             # 페이지별 모듈
-│           ├── account.js     # 비밀번호 변경
-│           ├── admins.js      # 관리자 관리
-│           ├── client-logs.js # 클라이언트 로그 관리
-│           ├── dashboard.js   # 대시보드
-│           ├── devices.js     # 디바이스 관리
-│           ├── licenses.js    # 라이선스 관리
-│           ├── maintenance.js # 유지보수 (디바이스 정리)
-│           ├── policies.js    # 정책 관리
-│           └── products.js    # 제품 관리
-│
-├── docs/                      # Swagger API 문서
-│   ├── docs.go
-│   ├── swagger.json
-│   └── swagger.yaml
-│
-├── logs/                      # 로그 파일 (자동 생성)
-├── API_TESTS.md               # API 테스트 가이드
-└── README.md                  # 이 파일
-```
-
-## 보안 기능
-
-### 인증 & 권한
-- ✅ JWT 토큰 기반 인증 (Bearer Token)
-- ✅ bcrypt 비밀번호 해싱 (cost 10)
-- ✅ 역할 기반 접근 제어 (Super Admin / Admin)
-- ✅ 토큰 만료 시간 관리
-
-### 데이터 보호
-- ✅ 디바이스 핑거프린트 해싱 (SHA-256)
-- ✅ SQL Injection 방지 (Prepared Statement)
-- ✅ XSS 방지 (HTML Escape)
-
-### 감사 추적
-- ✅ 모든 관리자 활동 로깅
-- ✅ 디바이스 활동 로깅
-- ✅ 로그인 시도 기록
-
-## 최근 업데이트
-
-### v2.4.0 - 프론트엔드 완전 모듈화 (2025-10-27)
-
-#### 주요 변경사항
-- 🎨 **레거시 코드 완전 제거**
-  - app.js (1190 lines) 삭제 ✅
-  - products.js 삭제 ✅
-  - legacy-bridge.js 삭제 ✅
-  - 100% ES6 모듈 구조로 전환
-
-- 📦 **Modern 모듈 시스템**
-  - 기능별 명확한 모듈 분리
-  - pages/ 디렉토리에 9개 페이지 모듈
-  - 단일 책임 원칙 준수
-  - Import/Export로 의존성 명확화
-
-- 🔧 **새로 추가된 모듈**
-  - `pages/account.js` - 비밀번호 변경
-  - `pages/devices.js` - 디바이스 관리 (카드 렌더링, 활성화/비활성화)
-  - `pages/maintenance.js` - 디바이스 정리
-
-- 🛠️ **유틸리티 통합**
-  - `utils.js`에 공통 함수 통합
-  - `safeParseJSON()`, `getValidationWarning()` 등
-  - `renderDeviceStatusBadge()`, `copyToClipboard()` 등
-
-#### 기술적 개선
-- 코드 중복 1000+ 라인 제거
-- 유지보수성 대폭 향상
-- 테스트 가능한 모듈 구조
-- 명확한 의존성 관리
-
-#### 구조 개선
-**Before:**
-```
-web/
-├── app.js (1190 lines) ❌
-├── products.js ❌
-└── js/
-    ├── legacy-bridge.js ❌
-    └── pages/ (일부 중복)
-```
-
-**After:**
-```
-web/
-└── js/
-    ├── main.js (진입점)
-    ├── api.js, modals.js, state.js, utils.js, ui.js
-    └── pages/
-        ├── account.js
-        ├── admins.js
-        ├── dashboard.js
-        ├── devices.js ⭐ NEW
-        ├── licenses.js
-        ├── maintenance.js ⭐ NEW
-        ├── policies.js
-        ├── products.js
-        └── client-logs.js
-```
-
-### v2.3.0 - 데이터베이스 단순화 & UI 개선 (2025-10-26)
-
-#### 주요 변경사항
-- 🗄️ **MySQL 전용으로 전환**
-  - SQLite 지원 제거로 코드베이스 단순화
-  - MySQL 최적화된 쿼리 및 인덱스 구조
-  - 안정적인 프로덕션 환경 지원
-
-- 📝 **클라이언트 로그 시스템 추가**
-  - 클라이언트 애플리케이션에서 로그 수집
-  - 5가지 로그 레벨 (DEBUG, INFO, WARN, ERROR, FATAL)
-  - 라이선스 키 및 디바이스별 필터링
-  - 스택 트레이스 및 상세 정보 기록
-  - 날짜 기반 로그 정리 기능
-
-- 🎨 **UI/UX 대폭 개선**
-  - 로그인 시 alert 팝업 제거 (인라인 에러 표시)
-  - 모달 z-index 충돌 문제 전면 해결
-  - 모든 생성/수정/삭제 작업에서 일관된 모달 처리
-  - 관리자 생성, 정책 관리, 라이선스 관리, 제품 관리, 비밀번호 변경, 로그 정리 등 모든 모달에서 alert가 최상위에 표시
-  - 에러 발생 시에도 모달을 먼저 닫고 alert 표시
-
-- 🐛 **버그 수정**
-  - 대시보드 활동 로그 500 에러 수정 (UNION 쿼리 타입 불일치)
-  - MySQL INDEX 생성 구문 수정 (`IF NOT EXISTS` 제거)
-  - NULL 값 처리 개선 (빈 문자열로 통일)
-  - 에러 메시지 로깅 강화
-
-#### 기술적 개선
-- `database.Initialize()` 함수 단순화 (단일 DSN 파라미터)
-- 테이블 생성 시 인덱스를 함께 정의하여 안정성 향상
-- 모달 닫기 → 300ms 대기 → alert 표시 패턴 전역 적용
-- `showConfirm` → 작업 수행 → 모달 닫기 → `showAlert` 순서 표준화
-
-### v2.2.0 - 프로젝트 전반 검토 & 동기화 (2025-10-26)
-
-#### 개선사항
-- 📚 **Swagger 문서 완전 동기화**
-  - 모든 API 엔드포인트 문서화 완료
-  - 클라이언트 로그 API 3개 추가
-  - 요청/응답 스키마 정확성 향상
-  - 95% 이상 문서화 달성
-
-- 🔍 **코드 품질 개선**
-  - 미사용 함수 및 중복 코드 제거
-  - 일관된 에러 처리 패턴 적용
-  - 코드 주석 및 문서 개선
-
-### v2.1.0 - 디바이스 관리 강화 (2025-10-20)
-
-#### 신규 기능
-- 🖥️ **디바이스 관리 개선**
-  - 실시간 디바이스 슬롯 추적 (X/Y 형식으로 표시)
-  - 비활성화 시 즉시 슬롯 해제
-  - 재활성화 시 즉시 슬롯 사용
-  - 상세 창 및 목록에서 실시간 업데이트
-
-- 🧹 **비활성 디바이스 정리 강화**
-  - 0일부터 설정 가능 (기존 1일 이상에서 변경)
-  - 0일 설정 시 모든 비활성 디바이스 즉시 삭제
-  - MySQL 날짜 형식 호환성 개선
-  - 정리 로그에 cutoff_date 표시
-
-- 🔒 **라이선스 수정 검증 강화**
-  - 최대 디바이스 수를 현재 활성 디바이스보다 작게 설정 불가
-  - 명확한 오류 메시지 제공
-  - "현재 X개 디바이스가 활성화되어 있습니다" 안내
-
-- 🎨 **UI/UX 개선**
-  - 디바이스 상세 정보 표시 (Client ID, Hostname, OS, OS Version 등)
-  - 모달 z-index 우선순위 조정 (Alert > 일반 모달)
-  - 디바이스 카드에서 불필요한 삭제 버튼 제거
-  - 디바이스 슬롯 레이블 변경 ("최대 디바이스" → "디바이스 슬롯")
-
-#### 개선사항
-- 디바이스 비활성화/재활성화 후 상세 창 실시간 갱신
-- 라이선스 목록에서 남은 슬롯 표시 개선
-- cleanup API에서 날짜 형식 문자열로 변환하여 MySQL 호환성 향상
-- 모달 우선순위 시스템 개선 (15000+ for alerts)
-
-#### 버그 수정
-- 비활성 디바이스 정리 쿼리 수정 (`<` → `<=`)
-- 디바이스 정보 JSON 파싱 오류 수정 (snake_case 지원)
-- Alert 모달이 일반 모달 뒤에 표시되는 문제 해결
-
-### v2.0.0 - 정책 시스템 도입 (2025-10-20)
-
-#### 신규 기능
-- 🛡️ **정책 관리 시스템 추가**
-  - 제품과 독립적인 정책 시스템
-  - JSON 기반 유연한 정책 데이터
-  - 정책 CRUD 기능
-  - 정책 활성/비활성 상태 관리
-
-- 🎫 **라이선스-정책 연동**
-  - 라이선스 생성 시 정책 선택
-  - 라이선스 수정 시 정책 변경
-  - 정책 없이도 라이선스 발급 가능
-
-- 🎨 **UI/UX 개선**
-  - 정책 관리 페이지 추가
-  - 라이선스 수정 모달 추가
-  - 테이블 버튼 순서 개선 (상세-수정-삭제)
-  - 일관된 디자인 시스템 적용
-
-- 📊 **활동 로그 강화**
-  - 정책 생성/수정/삭제 로그
-  - 라이선스 수정 로그
-  - 이모지 아이콘으로 가독성 향상
-
-#### 개선사항
-- 라이선스 테이블에 정책 컬럼 추가
-- 라이선스 상세 페이지에 정책 정보 표시
-- 정책 삭제 시 라이선스 영향도 처리
-- 모달 스타일 및 레이아웃 개선
-
-## 개발 가이드
-
-### 새로운 API 추가
-
-1. `models/` 에 데이터 모델 추가
-2. `handlers/` 에 핸들러 함수 작성
-3. `main.go` 에 라우트 등록
-4. Swagger 주석 추가 (`@Summary`, `@Description` 등)
-
-### 프론트엔드 페이지 추가
-
-1. `web/js/pages/` 에 페이지 JS 파일 생성
-2. `web/index.html` 에 HTML 섹션 추가
-3. `web/js/main.js` 에서 import 및 라우팅 연결
-4. 필요한 모달을 `index.html` 에 추가
-
-### 데이터베이스 스키마 변경
-
-1. `database/database.go` 에서 `CREATE TABLE` 문 수정
-2. 기존 DB 백업 후 삭제하고 재실행하여 테이블 재생성
-3. 또는 `ALTER TABLE` 문을 직접 실행
-
-## 문제 해결
-
-### 포트 충돌 (8080 사용 중)
-```bash
-# Windows
-netstat -ano | findstr :8080
-taskkill /PID <PID> /F
-
-# Linux/Mac
-lsof -i :8080
-kill -9 <PID>
-```
-
-### 데이터베이스 연결 실패
-- MySQL 서비스가 실행 중인지 확인
-- 접속 정보(username, password, host) 확인
-- 데이터베이스가 생성되었는지 확인
-
-### 로그인 실패
-- 기본 계정: `admin / admin123`
-- 비밀번호를 잊었다면 DB에서 직접 수정 또는 DB 재생성
-
-## 라이선스
-
-MIT License
-
-## 기여
-
-이슈와 PR은 언제나 환영합니다!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 문의
-
-프로젝트 관련 문의사항은 Issues 탭을 이용해주세요.
+문제나 개선 제안은 Issues 탭을 이용해 주세요.
