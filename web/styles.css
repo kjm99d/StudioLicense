@@ -1776,3 +1776,8 @@ details pre {
     padding: 1.6rem 1.65rem;
     margin-bottom: 32px;
 }
+#admins-content .table-container table th,
+#admins-content .table-container table td {
+    text-align: center;
+    vertical-align: middle;
+}
