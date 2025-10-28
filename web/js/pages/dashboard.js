@@ -63,7 +63,14 @@ export async function loadRecentActivities() {
               'delete_policy': '🗑️',
               'deactivate_device': '👮',
               'reactivate_device': '👮',
-              'cleanup_devices': '🧹'
+              'cleanup_devices': '🧹',
+              'upload_file': '📤',
+              'delete_file': '🗑️',
+              'download_file': '📥',
+              'attach_product_file': '📝',
+              'update_product_file': '🛠️',
+              'delete_product_file': '🗑️',
+              'delete_device': '🗑️'
             };
             const icon = iconMap[a.action] || '👤';
             const label = `${icon} ${actionLabel}`;

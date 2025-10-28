@@ -50,7 +50,11 @@ export function formatAdminAction(action) {
     'delete_admin': '관리자 삭제',
     'upload_file': '파일 업로드',
     'delete_file': '파일 삭제',
-    'download_file': '파일 다운로드'
+    'download_file': '파일 다운로드',
+    'attach_product_file': '제품 파일 연결',
+    'update_product_file': '제품 파일 수정',
+    'delete_product_file': '제품 파일 해제',
+    'delete_device': '디바이스 삭제'
   };
   return actionMap[action] || action;
 }

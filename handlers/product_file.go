@@ -159,7 +159,7 @@ func AttachProductFile(w http.ResponseWriter, r *http.Request) {
 
 	if adminID, ok := r.Context().Value("admin_id").(string); ok && adminID != "" {
 		username, _ := r.Context().Value("username").(string)
-		utils.LogAdminActivity(adminID, username, models.AdminActionAttachProductFile, fmt.Sprintf("Attached file %s to product %s", req.FileID, req.ProductID))
+		utils.LogAdminActivity(adminID, username, models.AdminActionAttachProductFile, fmt.Sprintf("제품 %s에 파일 %s 연결", req.ProductID, req.FileID))
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -272,7 +272,7 @@ func UpdateProductFile(w http.ResponseWriter, r *http.Request) {
 
 	if adminID, ok := r.Context().Value("admin_id").(string); ok && adminID != "" {
 		username, _ := r.Context().Value("username").(string)
-		utils.LogAdminActivity(adminID, username, models.AdminActionUpdateProductFile, fmt.Sprintf("Updated product file %s for product %s", req.ID, current.ProductID))
+		utils.LogAdminActivity(adminID, username, models.AdminActionUpdateProductFile, fmt.Sprintf("제품 %s의 파일 %s 정보 수정", current.ProductID, req.ID))
 	}
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("Product file updated", updated))
@@ -320,7 +320,7 @@ func DeleteProductFile(w http.ResponseWriter, r *http.Request) {
 
 	if adminID, ok := r.Context().Value("admin_id").(string); ok && adminID != "" {
 		username, _ := r.Context().Value("username").(string)
-		utils.LogAdminActivity(adminID, username, models.AdminActionDeleteProductFile, fmt.Sprintf("Detached file %s from product %s", item.FileID, item.ProductID))
+		utils.LogAdminActivity(adminID, username, models.AdminActionDeleteProductFile, fmt.Sprintf("제품 %s에서 파일 %s 연결 해제", item.ProductID, item.FileID))
 	}
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("Product file detached", nil))

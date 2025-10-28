@@ -256,6 +256,7 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
+		license.ExpiresAt = normalizeDateOnly(license.ExpiresAt)
 		licenses = append(licenses, license)
 	}
 
@@ -326,6 +327,8 @@ func GetLicense(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to retrieve license", err))
 		return
 	}
+
+	license.ExpiresAt = normalizeDateOnly(license.ExpiresAt)
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("License retrieved", license))
 }
@@ -496,7 +499,7 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 			changes = append(changes, fmt.Sprintf("만료일: %s", expiresAtStr))
 		}
 
-		details := fmt.Sprintf("라이선스 ID: %s, 변경사항: %s", id, strings.Join(changes, ", "))
+		details := fmt.Sprintf("라이선스 ID: %s | 변경사항: %s", id, strings.Join(changes, " | "))
 		utils.LogAdminActivity(adminID, username, "라이선스 수정", details)
 	}
 
@@ -588,4 +591,26 @@ func GetLicenseDevices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("Devices retrieved", devices))
+}
+func normalizeDateOnly(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	layouts := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t.Format("2006-01-02")
+		}
+	}
+	if len(value) >= 10 {
+		return value[:10]
+	}
+	return value
 }
