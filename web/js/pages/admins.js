@@ -282,7 +282,7 @@ export async function loadAdmins() {
             manageBtn.dataset.adminId = String(a.id);
             manageBtn.dataset.adminName = String(a.username);
             manageBtn.dataset.permissions = permissionKeys.join(',');
-            manageBtn.textContent = '⚙️ 권한 설정';
+            manageBtn.textContent = '⚙️ 기능 권한';
             actionsDiv.appendChild(manageBtn);
 
             const resetA = document.createElement('a');
