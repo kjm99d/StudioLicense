@@ -1522,7 +1522,7 @@ const docTemplate = `{
         },
         "/api/license/activate": {
             "post": {
-                "description": "라이선스 키를 사용하여 디바이스를 활성화합니다",
+                "description": "디바이스를 라이선스에 등록하고 정책 및 다운로드 가능한 제품 파일 정보를 반환합니다.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1530,12 +1530,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "클라이언트 - 라이선스"
+                    "라이선스-클라이언트"
                 ],
                 "summary": "라이선스 활성화",
                 "parameters": [
                     {
-                        "description": "활성화 정보",
+                        "description": "활성화 요청 본문",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -1546,13 +1546,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "이미 활성화됨",
+                        "description": "이미 활성화된 디바이스",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "201": {
-                        "description": "활성화 성공",
+                        "description": "활성화 완료",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
@@ -1564,19 +1564,90 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "라이선스 비활성/만료/기기수 초과",
+                        "description": "라이선스 비활성/만료 또는 디바이스 제한 초과",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "404": {
-                        "description": "라이선스 없음",
+                        "description": "라이선스를 찾을 수 없음",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "500": {
-                        "description": "서버 에러",
+                        "description": "서버 내부 오류",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/license/files/{file_id}": {
+            "get": {
+                "description": "서명된 다운로드 URL을 사용하여 제품 파일을 전송합니다.",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "라이선스-파일"
+                ],
+                "summary": "제품 파일 다운로드 (클라이언트용)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "파일 ID",
+                        "name": "file_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "만료 타임스탬프(Unix)",
+                        "name": "exp",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "임의 난수",
+                        "name": "nonce",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "서명 값",
+                        "name": "sig",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "파일 스트림"
+                    },
+                    "400": {
+                        "description": "요청 파라미터 오류",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "서명 검증 실패 또는 만료",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "파일 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "내부 오류",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
@@ -1586,7 +1657,7 @@ const docTemplate = `{
         },
         "/api/license/validate": {
             "post": {
-                "description": "앱 실행 시 라이선스를 검증합니다",
+                "description": "라이선스에 등록된 디바이스인지 확인하고 정책 및 제품 파일 정보를 반환합니다.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1594,12 +1665,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "클라이언트 - 라이선스"
+                    "라이선스-클라이언트"
                 ],
                 "summary": "라이선스 검증",
                 "parameters": [
                     {
-                        "description": "검증 정보",
+                        "description": "검증 요청 본문",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -1622,19 +1693,19 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "라이선스 비활성/만료 또는 디바이스 미등록",
+                        "description": "라이선스 비활성, 미등록 디바이스 또는 만료",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "404": {
-                        "description": "라이선스 없음",
+                        "description": "라이선스를 찾을 수 없음",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
                     "500": {
-                        "description": "서버 에러",
+                        "description": "서버 내부 오류",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }

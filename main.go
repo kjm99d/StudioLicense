@@ -308,6 +308,13 @@ func main() {
 			middleware.SetJSONHeader,
 		))
 
+	mux.HandleFunc("/api/license/files/",
+		middleware.ChainMiddleware(
+			handlers.DownloadProductFile,
+			middleware.LoggingMiddleware,
+			middleware.CORSMiddleware,
+		))
+
 	// 클라이언트 로그 API (인증 불필요)
 	mux.HandleFunc("/api/client/logs",
 		middleware.ChainMiddleware(

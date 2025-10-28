@@ -12,19 +12,19 @@ import (
 	"time"
 )
 
-// ActivateLicense ?쇱씠?좎뒪 ?쒖꽦??(理쒖큹 ?깅줉)
-// @Summary ?쇱씠?좎뒪 ?쒖꽦??
-// @Description ?쇱씠?좎뒪 ?ㅻ? ?ъ슜?섏뿬 ?붾컮?댁뒪瑜??쒖꽦?뷀빀?덈떎
-// @Tags ?대씪?댁뼵??- ?쇱씠?좎뒪
+// ActivateLicense는 주어진 라이선스 키에 대해 디바이스 활성화를 생성하거나 재사용합니다.
+// @Summary 라이선스 활성화
+// @Description 디바이스를 라이선스에 등록하고 정책 및 다운로드 가능한 제품 파일 정보를 반환합니다.
+// @Tags 라이선스-클라이언트
 // @Accept json
 // @Produce json
-// @Param request body models.ActivateRequest true "?쒖꽦???뺣낫"
-// @Success 201 {object} models.APIResponse "?쒖꽦???깃났"
-// @Success 200 {object} models.APIResponse "?대? ?쒖꽦?붾맖"
-// @Failure 400 {object} models.APIResponse "?섎せ???붿껌"
-// @Failure 403 {object} models.APIResponse "?쇱씠?좎뒪 鍮꾪솢??留뚮즺/湲곌린??珥덇낵"
-// @Failure 404 {object} models.APIResponse "?쇱씠?좎뒪 ?놁쓬"
-// @Failure 500 {object} models.APIResponse "?쒕쾭 ?먮윭"
+// @Param request body models.ActivateRequest true "활성화 요청 본문"
+// @Success 201 {object} models.APIResponse "활성화 완료"
+// @Success 200 {object} models.APIResponse "이미 활성화된 디바이스"
+// @Failure 400 {object} models.APIResponse "잘못된 요청"
+// @Failure 403 {object} models.APIResponse "라이선스 비활성/만료 또는 디바이스 제한 초과"
+// @Failure 404 {object} models.APIResponse "라이선스를 찾을 수 없음"
+// @Failure 500 {object} models.APIResponse "서버 내부 오류"
 // @Router /api/license/activate [post]
 func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 	requestID := r.Context().Value("request_id")
@@ -47,7 +47,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		"device_name": req.DeviceInfo.Hostname,
 	}).Info("License activation attempt")
 
-	// ?쇱씠?좎뒪 議고쉶
+	// 라이선스 메타데이터를 조회합니다.
 	var license models.License
 	var productID sql.NullString
 	var policyID sql.NullString
@@ -99,7 +99,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		*license.PolicyID = policyID.String
 	}
 
-	// ?쇱씠?좎뒪 ?좏슚??寃??
+	// 라이선스가 활성 상태이며 만료되지 않았는지 확인합니다.
 	if license.Status != models.LicenseStatusActive {
 		logger.WithFields(map[string]interface{}{
 			"request_id":  requestID,
@@ -124,7 +124,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ?붾컮?댁뒪 ?묎굅?꾨┛???앹꽦
+	// 디바이스 정보를 이용해 핑거프린트를 생성합니다.
 	fingerprint := utils.GenerateDeviceFingerprint(
 		req.DeviceInfo.ClientID,
 		req.DeviceInfo.CPUID,
@@ -134,13 +134,13 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		req.DeviceInfo.MachineID,
 	)
 
-	// ?대? ?쒖꽦?붾맂 ?붾컮?댁뒪?몄? ?뺤씤
+	// 해당 디바이스가 이미 활성화되어 있는지 확인합니다.
 	var existingID string
 	checkQuery := "SELECT id FROM device_activations WHERE license_id = ? AND device_fingerprint = ? AND status = ?"
 	err = database.DB.QueryRow(checkQuery, license.ID, fingerprint, models.DeviceStatusActive).Scan(&existingID)
 
 	if err == nil {
-		// ?대? ?쒖꽦?붾맖
+		// 이미 활성화된 디바이스이므로 기존 정보를 그대로 반환합니다.
 		logger.WithFields(map[string]interface{}{
 			"request_id":  requestID,
 			"license_key": req.LicenseKey,
@@ -170,7 +170,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ?꾩옱 ?쒖꽦?붾맂 ?붾컮?댁뒪 ???뺤씤
+	// 라이선스에 허용된 활성 디바이스 수를 초과했는지 검사합니다.
 	var activeCount int
 	countQuery := "SELECT COUNT(*) FROM device_activations WHERE license_id = ? AND status = ?"
 	err = database.DB.QueryRow(countQuery, license.ID, models.DeviceStatusActive).Scan(&activeCount)
@@ -199,10 +199,10 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ?붾컮?댁뒪 ?뺣낫 JSON 吏곷젹??
+	// 디바이스 정보를 JSON 문자열로 직렬화합니다.
 	deviceInfoJSON, _ := json.Marshal(req.DeviceInfo)
 
-	// ?붾컮?댁뒪 ?쒖꽦??
+	// 새로운 디바이스 활성화 데이터를 저장합니다.
 	deviceID, _ := utils.GenerateID("dev")
 	insertQuery := `INSERT INTO device_activations 
 		(id, license_id, device_fingerprint, device_info, device_name, status, activated_at, last_validated_at)
@@ -234,7 +234,7 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 		"customer":    license.CustomerName,
 	}).Info("License activated successfully")
 
-	// ?쒕룞 濡쒓렇 湲곕줉
+	// 디바이스 활동 로그를 남깁니다.
 	utils.LogDeviceActivity(deviceID, license.ID, models.DeviceActionActivated, "Device activated")
 
 	policies := loadPoliciesForLicense(license.PolicyID)
@@ -253,18 +253,18 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
-// ValidateLicense ?쇱씠?좎뒪 寃利?(???ㅽ뻾 ??
-// @Summary ?쇱씠?좎뒪 寃利?
-// @Description ???ㅽ뻾 ???쇱씠?좎뒪瑜?寃利앺빀?덈떎
-// @Tags ?대씪?댁뼵??- ?쇱씠?좎뒪
+// ValidateLicense는 등록된 디바이스가 라이선스를 사용할 수 있는지 검증합니다.
+// @Summary 라이선스 검증
+// @Description 라이선스에 등록된 디바이스인지 확인하고 정책 및 제품 파일 정보를 반환합니다.
+// @Tags 라이선스-클라이언트
 // @Accept json
 // @Produce json
-// @Param request body models.ValidateRequest true "寃利??뺣낫"
-// @Success 200 {object} models.APIResponse "寃利??깃났"
-// @Failure 400 {object} models.APIResponse "?섎せ???붿껌"
-// @Failure 403 {object} models.APIResponse "?쇱씠?좎뒪 鍮꾪솢??留뚮즺 ?먮뒗 ?붾컮?댁뒪 誘몃벑濡?"
-// @Failure 404 {object} models.APIResponse "?쇱씠?좎뒪 ?놁쓬"
-// @Failure 500 {object} models.APIResponse "?쒕쾭 ?먮윭"
+// @Param request body models.ValidateRequest true "검증 요청 본문"
+// @Success 200 {object} models.APIResponse "검증 성공"
+// @Failure 400 {object} models.APIResponse "잘못된 요청"
+// @Failure 403 {object} models.APIResponse "라이선스 비활성, 미등록 디바이스 또는 만료"
+// @Failure 404 {object} models.APIResponse "라이선스를 찾을 수 없음"
+// @Failure 500 {object} models.APIResponse "서버 내부 오류"
 // @Router /api/license/validate [post]
 func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 	requestID := r.Context().Value("request_id")
@@ -281,7 +281,7 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 		"license_key": req.LicenseKey,
 	}).Debug("License validation request")
 
-	// ?쇱씠?좎뒪 議고쉶
+	// 검증을 위해 라이선스 메타데이터를 다시 조회합니다.
 	var license models.License
 	var productID sql.NullString
 	var policyID sql.NullString
@@ -319,7 +319,7 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 		*license.PolicyID = policyID.String
 	}
 
-	// ?쇱씠?좎뒪 ?좏슚??寃??
+	// 라이선스가 활성 상태이며 만료되지 않았는지 확인합니다.
 	if license.Status != models.LicenseStatusActive {
 		w.WriteHeader(http.StatusForbidden)
 		json.NewEncoder(w).Encode(models.ErrorResponse("License is not active", nil))
@@ -332,7 +332,7 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ?붾컮?댁뒪 ?묎굅?꾨┛???앹꽦
+	// 디바이스 핑거프린트를 생성합니다.
 	fingerprint := utils.GenerateDeviceFingerprint(
 		req.DeviceInfo.ClientID,
 		req.DeviceInfo.CPUID,
@@ -342,7 +342,7 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 		req.DeviceInfo.MachineID,
 	)
 
-	// ?붾컮?댁뒪 ?쒖꽦???щ? ?뺤씤
+	// 활성화된 디바이스인지 확인합니다.
 	var deviceID string
 	deviceQuery := "SELECT id FROM device_activations WHERE license_id = ? AND device_fingerprint = ? AND status = ?"
 	err = database.DB.QueryRow(deviceQuery, license.ID, fingerprint, models.DeviceStatusActive).Scan(&deviceID)
@@ -359,7 +359,7 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 留덉?留?寃利??쒓컙 ?낅뜲?댄듃
+	// 마지막 검증 시각을 갱신합니다.
 	updateQuery := "UPDATE device_activations SET last_validated_at = ? WHERE id = ?"
 	database.DB.Exec(updateQuery, time.Now().Format("2006-01-02 15:04:05"), deviceID)
 
@@ -476,13 +476,27 @@ func loadProductFilesForProduct(productID *string) []models.ProductFileResponse 
 			item.Checksum = checksum.String
 		}
 
-		downloadURL := fmt.Sprintf("/api/admin/files/%s?download=1", item.FileID)
 		if item.DeliveryURL != "" {
 			item.URL = item.DeliveryURL
-		} else {
-			item.URL = downloadURL
 		}
-		item.DownloadURL = downloadURL
+
+		if signedQuery, err := utils.GenerateSignedDownloadQuery(item.FileID, 5*time.Minute); err != nil {
+			logger.WithFields(map[string]interface{}{
+				"product_id": *productID,
+				"file_id":    item.FileID,
+				"error":      err.Error(),
+			}).Error("Failed to generate signed download URL for product file")
+			item.DownloadURL = ""
+			if item.URL == "" {
+				item.URL = ""
+			}
+		} else {
+			signedURL := fmt.Sprintf("/api/license/files/%s?%s", item.FileID, signedQuery)
+			item.DownloadURL = signedURL
+			if item.URL == "" {
+				item.URL = signedURL
+			}
+		}
 
 		files = append(files, item)
 	}
