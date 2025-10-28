@@ -13,9 +13,15 @@ import (
 
 // AdminCreateRequest 서브 관리자 생성 요청
 type AdminCreateRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Username    string   `json:"username"`
+	Email       string   `json:"email"`
+	Password    string   `json:"password"`
+	Permissions []string `json:"permissions"`
+}
+
+// AdminPermissionsUpdateRequest 관리자 권한 갱신 요청
+type AdminPermissionsUpdateRequest struct {
+	Permissions []string `json:"permissions"`
 }
 
 var emailRegex = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
@@ -37,6 +43,17 @@ func ListAdmins(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to scan admin", err))
 			return
+		}
+		if a.Role == "super_admin" {
+			a.Permissions = models.AllAdminPermissionKeys()
+		} else {
+			perms, err := utils.GetAdminPermissions(a.ID)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load permissions", err))
+				return
+			}
+			a.Permissions = perms
 		}
 		// Password는 비워둠
 		list = append(list, a)
@@ -117,6 +134,26 @@ func CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := utils.SetAdminPermissions(id, req.Permissions); err != nil {
+		switch err.(type) {
+		case *utils.InvalidPermissionError:
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse(err.Error(), nil))
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to assign permissions", err))
+		}
+		_, _ = database.DB.Exec("DELETE FROM admins WHERE id = ?", id)
+		return
+	}
+
+	perms, err := utils.GetAdminPermissions(id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load permissions", err))
+		return
+	}
+
 	logger.WithFields(map[string]interface{}{
 		"request_id": requestID,
 		"creator_id": creatorID,
@@ -128,12 +165,86 @@ func CreateAdmin(w http.ResponseWriter, r *http.Request) {
 
 	// 응답 (비밀번호는 제외)
 	created := models.Admin{
-		ID:       id,
-		Username: req.Username,
-		Email:    req.Email,
-		Role:     role,
+		ID:          id,
+		Username:    req.Username,
+		Email:       req.Email,
+		Role:        role,
+		Permissions: perms,
 	}
 	json.NewEncoder(w).Encode(models.SuccessResponse("Admin created", created))
+}
+
+// UpdateAdminPermissions 서브 관리자 권한 업데이트 (super_admin 전용)
+func UpdateAdminPermissions(w http.ResponseWriter, r *http.Request) {
+	requestID := r.Context().Value("request_id")
+	actorID, _ := r.Context().Value("admin_id").(string)
+	actorName, _ := r.Context().Value("username").(string)
+
+	adminID, _ := r.Context().Value("path_admin_id").(string)
+	if adminID == "" {
+		adminID = r.PathValue("admin_id")
+	}
+	if adminID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Admin ID is required", nil))
+		return
+	}
+
+	var req AdminPermissionsUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Invalid request body", err))
+		return
+	}
+
+	var username, role string
+	if err := database.DB.QueryRow("SELECT username, role FROM admins WHERE id = ?", adminID).Scan(&username, &role); err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Admin not found", nil))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load admin", err))
+		return
+	}
+
+	if role == "super_admin" {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Cannot modify super admin permissions", nil))
+		return
+	}
+
+	if err := utils.SetAdminPermissions(adminID, req.Permissions); err != nil {
+		switch err.(type) {
+		case *utils.InvalidPermissionError:
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(models.ErrorResponse(err.Error(), nil))
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to assign permissions", err))
+		}
+		return
+	}
+
+	perms, err := utils.GetAdminPermissions(adminID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load permissions", err))
+		return
+	}
+
+	logger.WithFields(map[string]interface{}{
+		"request_id": requestID,
+		"actor_id":   actorID,
+		"admin_id":   adminID,
+	}).Info("Admin permissions updated")
+
+	utils.LogAdminActivity(actorID, actorName, models.AdminActionUpdateAdminPerms, "Updated permissions for admin: "+username)
+
+	json.NewEncoder(w).Encode(models.SuccessResponse("Permissions updated", map[string]interface{}{
+		"permissions": perms,
+	}))
 }
 
 // ResetAdminPassword 관리자 비밀번호 초기화 (super_admin 전용)

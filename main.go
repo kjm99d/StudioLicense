@@ -11,6 +11,7 @@ import (
 	"studiolicense/handlers"
 	"studiolicense/logger"
 	"studiolicense/middleware"
+	"studiolicense/models"
 	"studiolicense/scheduler"
 	"syscall"
 	"time"
@@ -136,6 +137,7 @@ func main() {
 			handlers.GetLicenseDevices,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionLicensesView),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -146,6 +148,7 @@ func main() {
 			handlers.DeactivateDeviceByAdmin,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionDevicesManage),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -156,6 +159,7 @@ func main() {
 			handlers.ReactivateDeviceByAdmin,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionDevicesManage),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -166,6 +170,7 @@ func main() {
 			handlers.GetDeviceActivityLogs,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionDevicesView),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -176,6 +181,7 @@ func main() {
 			handlers.CleanupInactiveDevices,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionDevicesManage),
 			middleware.RequireRoles("super_admin"),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
@@ -188,6 +194,7 @@ func main() {
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
 			middleware.RequireRoles("super_admin", "admin"),
+			middleware.RequirePermissions(models.PermissionDevicesManage),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -246,6 +253,7 @@ func main() {
 			handlers.GetDashboardStats,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionDashboardView),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -255,6 +263,7 @@ func main() {
 			handlers.GetRecentActivities,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionDashboardView),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -273,6 +282,16 @@ func main() {
 	mux.HandleFunc("/api/admin/admins/create",
 		middleware.ChainMiddleware(
 			handlers.CreateAdmin,
+			middleware.LoggingMiddleware,
+			middleware.AuthMiddleware,
+			middleware.RequireRoles("super_admin"),
+			middleware.CORSMiddleware,
+			middleware.SetJSONHeader,
+		))
+
+	mux.HandleFunc("/api/admin/permissions/catalog",
+		middleware.ChainMiddleware(
+			handlers.GetAdminPermissionCatalog,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
 			middleware.RequireRoles("super_admin"),
@@ -330,6 +349,7 @@ func main() {
 			handlers.GetClientLogs,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
+			middleware.RequirePermissions(models.PermissionClientLogsView),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -340,7 +360,7 @@ func main() {
 			handlers.DeleteClientLogs,
 			middleware.LoggingMiddleware,
 			middleware.AuthMiddleware,
-			middleware.RequireRoles("super_admin"),
+			middleware.RequirePermissions(models.PermissionClientLogsManage),
 			middleware.CORSMiddleware,
 			middleware.SetJSONHeader,
 		))
@@ -420,8 +440,14 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func licenseHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionLicensesView) {
+			return
+		}
 		handlers.GetLicenses(w, r)
 	case http.MethodPost:
+		if !middleware.EnsurePermission(w, r, models.PermissionLicensesManage) {
+			return
+		}
 		handlers.CreateLicense(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -432,20 +458,17 @@ func licenseHandler(w http.ResponseWriter, r *http.Request) {
 func licenseDetailHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionLicensesView) {
+			return
+		}
 		handlers.GetLicense(w, r)
 	case http.MethodPut:
+		if !middleware.EnsurePermission(w, r, models.PermissionLicensesManage) {
+			return
+		}
 		handlers.UpdateLicense(w, r)
 	case http.MethodDelete:
-		// admin 권한 필요
-		if roleVal := r.Context().Value("role"); roleVal != nil {
-			if role, _ := roleVal.(string); role != "super_admin" && role != "admin" {
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(`{"status":"error","message":"Forbidden: insufficient role"}`))
-				return
-			}
-		} else {
-			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"status":"error","message":"Forbidden: insufficient role"}`))
+		if !middleware.EnsurePermission(w, r, models.PermissionLicensesManage) {
 			return
 		}
 		handlers.DeleteLicense(w, r)
@@ -458,8 +481,14 @@ func licenseDetailHandler(w http.ResponseWriter, r *http.Request) {
 func productHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionProductsView) {
+			return
+		}
 		handlers.GetProducts(w, r)
 	case http.MethodPost:
+		if !middleware.EnsurePermission(w, r, models.PermissionProductsManage) {
+			return
+		}
 		handlers.CreateProduct(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -470,20 +499,17 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 func productDetailHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionProductsView) {
+			return
+		}
 		handlers.GetProduct(w, r)
 	case http.MethodPut:
+		if !middleware.EnsurePermission(w, r, models.PermissionProductsManage) {
+			return
+		}
 		handlers.UpdateProduct(w, r)
 	case http.MethodDelete:
-		// Require super_admin for destructive delete
-		if roleVal := r.Context().Value("role"); roleVal != nil {
-			if role, _ := roleVal.(string); role != "super_admin" {
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(`{"status":"error","message":"Forbidden: insufficient role"}`))
-				return
-			}
-		} else {
-			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"status":"error","message":"Forbidden: insufficient role"}`))
+		if !middleware.EnsurePermission(w, r, models.PermissionProductsManage) {
 			return
 		}
 		handlers.DeleteProduct(w, r)
@@ -496,12 +522,24 @@ func productDetailHandler(w http.ResponseWriter, r *http.Request) {
 func productFileRouter(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesView) {
+			return
+		}
 		handlers.ListProductFiles(w, r)
 	case http.MethodPost:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesManage) {
+			return
+		}
 		handlers.AttachProductFile(w, r)
 	case http.MethodPut:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesManage) {
+			return
+		}
 		handlers.UpdateProductFile(w, r)
 	case http.MethodDelete:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesManage) {
+			return
+		}
 		handlers.DeleteProductFile(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -512,8 +550,14 @@ func productFileRouter(w http.ResponseWriter, r *http.Request) {
 func policyHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionPoliciesView) {
+			return
+		}
 		handlers.GetAllPolicies(w, r)
 	case http.MethodPost:
+		if !middleware.EnsurePermission(w, r, models.PermissionPoliciesManage) {
+			return
+		}
 		handlers.CreatePolicy(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -524,10 +568,19 @@ func policyHandler(w http.ResponseWriter, r *http.Request) {
 func policyDetailHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionPoliciesView) {
+			return
+		}
 		handlers.GetPolicy(w, r)
 	case http.MethodPut:
+		if !middleware.EnsurePermission(w, r, models.PermissionPoliciesManage) {
+			return
+		}
 		handlers.UpdatePolicy(w, r)
 	case http.MethodDelete:
+		if !middleware.EnsurePermission(w, r, models.PermissionPoliciesManage) {
+			return
+		}
 		handlers.DeletePolicy(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -538,8 +591,14 @@ func policyDetailHandler(w http.ResponseWriter, r *http.Request) {
 func fileHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesView) {
+			return
+		}
 		handlers.ListFiles(w, r)
 	case http.MethodPost:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesManage) {
+			return
+		}
 		handlers.UploadFile(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -550,15 +609,13 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 func fileDetailHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesView) {
+			return
+		}
 		handlers.GetFile(w, r)
 	case http.MethodDelete:
-		roleVal := r.Context().Value("role")
-		if roleVal != nil {
-			if role, _ := roleVal.(string); role != "super_admin" && role != "admin" {
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(`{"status":"error","message":"Forbidden: insufficient role"}`))
-				return
-			}
+		if !middleware.EnsurePermission(w, r, models.PermissionFilesManage) {
+			return
 		}
 		handlers.DeleteFile(w, r)
 	default:
@@ -585,6 +642,13 @@ func adminDetailHandler(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 
 	switch r.Method {
+	case http.MethodPut:
+		if len(pathParts) > 5 && pathParts[5] == "permissions" {
+			handlers.UpdateAdminPermissions(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"status":"error","message":"Invalid request"}`))
 	case http.MethodPost:
 		// POST로 비밀번호 초기화 (경로: /api/admin/admins/{admin_id}/reset-password)
 		if len(pathParts) > 5 && pathParts[5] == "reset-password" {

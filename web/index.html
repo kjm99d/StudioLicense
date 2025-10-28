@@ -317,15 +317,16 @@
                     <table class="striped highlight responsive-table">
                         <thead>
                             <tr>
-                                <th>아이디</th>
+                                <th>아이디/유저명</th>
                                 <th>이메일</th>
                                 <th>역할</th>
+                                <th>권한</th>
                                 <th>생성일</th>
                                 <th>작업</th>
                             </tr>
                         </thead>
                         <tbody id="admins-tbody">
-                            <tr><td colspan="5" class="text-center">로딩 중...</td></tr>
+                            <tr><td colspan="6" class="text-center">로딩 중...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -403,7 +404,7 @@
             <div id="policies-content" class="content">
                 <div class="page-header">
                     <h2>🛡️ 정책 관리</h2>
-                    <button class="btn blue" onclick="openCreatePolicyModal()">
+                    <button id="create-policy-btn" class="btn blue" onclick="openCreatePolicyModal()">
                         <span class="btn-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>새 정책 생성
                     </button>
                 </div>
@@ -804,9 +805,38 @@
                     <label for="admin_password">비밀번호 (8자 이상) *</label>
                     <input type="password" id="admin_password" name="password" minlength="8" required>
                 </div>
+                <div class="form-group">
+                    <label>기능 권한</label>
+                    <div id="create-admin-permissions" class="permission-grid"></div>
+                    <small class="permission-helper">필요한 기능 권한만 선택하세요.</small>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn grey darken-1 modal-close">취소</button>
                     <button type="submit" class="btn green">생성</button>
+                </div>
+            </form>
+    </div>
+</div>
+
+    <div id="manage-admin-permissions-modal" class="modal studio-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>관리자 기능 권한</h3>
+                <button class="modal-close" aria-label="닫기" title="닫기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="manage-admin-permissions-form">
+                <input type="hidden" id="manage-admin-id">
+                <div class="modal-body">
+                    <p class="permission-modal-intro"><strong id="manage-admin-name"></strong> 관리자에게 부여할 기능 권한을 선택하세요.</p>
+                    <div id="manage-admin-permissions" class="permission-grid"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn grey darken-1 modal-close">취소</button>
+                    <button type="submit" class="btn blue">저장</button>
                 </div>
             </form>
         </div>

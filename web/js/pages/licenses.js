@@ -1,13 +1,33 @@
-import { state } from '../state.js';
+import { state, hasPermission } from '../state.js';
 import { apiFetch, API_BASE_URL } from '../api.js';
 import { openModal, closeModal, showAlert, showConfirm } from '../modals.js';
 import { formatDate } from '../utils.js';
 import { renderStatusBadge } from '../ui.js';
 import { renderDeviceCard } from './devices.js';
+import { PERMISSIONS } from '../permissions.js';
 
 let productsCached = null; // 제품 목록 캐시
+const canViewLicenses = () => hasPermission(PERMISSIONS.LICENSES_VIEW);
+const canManageLicenses = () => hasPermission(PERMISSIONS.LICENSES_MANAGE);
+
+function ensureLicenseManagePermission() {
+  if (!canManageLicenses()) {
+    showAlert('라이선스를 관리할 권한이 없습니다.', '권한 부족');
+    return false;
+  }
+  return true;
+}
 
 export async function loadLicenses(page = 1) {
+  if (!canViewLicenses()) {
+    const tbody = document.getElementById('licenses-tbody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="8" class="loading">라이선스를 볼 권한이 없습니다.</td></tr>';
+    }
+    const pagination = document.getElementById('pagination');
+    if (pagination) pagination.innerHTML = '';
+    return;
+  }
   try {
     let url = `${API_BASE_URL}/api/admin/licenses?page=${page}&page_size=10`;
     if (state.currentStatus) url += `&status=${state.currentStatus}`;
@@ -34,6 +54,7 @@ function renderLicensesTable(licenses) {
     return;
   }
   console.log('Rendering licenses table with data:', licenses);
+  const manage = canManageLicenses();
   tbody.innerHTML = licenses.map(license => {
     const statusHtml = renderStatusBadge(license.status);
     const policyDisplay = license.policy_name || '정책 없음';
@@ -41,6 +62,15 @@ function renderLicensesTable(licenses) {
     const remainingDevices = license.max_devices - activeDevices;
     const deviceUsage = `${remainingDevices}/${license.max_devices}`;
     console.log(`License ${license.id} status: ${license.status} -> HTML: ${statusHtml.substring(0, 80)}`);
+    const actionButtons = [
+      `<button class="btn btn-sm" onclick="viewLicense('${license.id}')">상세</button>`
+    ];
+    if (manage) {
+      actionButtons.push(
+        `<button class="btn btn-sm btn-warning" onclick="openEditLicenseModal('${license.id}')">✏️ 수정</button>`,
+        `<button class="btn btn-sm btn-danger" onclick="deleteLicense('${license.id}')">🗑️ 삭제</button>`
+      );
+    }
     return `
     <tr>
       <td><code>${license.license_key}</code></td>
@@ -51,9 +81,7 @@ function renderLicensesTable(licenses) {
       <td>${formatDate(license.expires_at)}</td>
       <td>${statusHtml}</td>
       <td>
-        <button class="btn btn-sm" onclick="viewLicense('${license.id}')">상세</button>
-        <button class="btn btn-sm btn-warning" onclick="openEditLicenseModal('${license.id}')">✏️ 수정</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteLicense('${license.id}')">🗑️ 삭제</button>
+        ${actionButtons.join(' ')}
       </td>
     </tr>
   `;
@@ -74,6 +102,7 @@ function renderPagination(meta) {
 }
 
 export function openLicenseModal() {
+  if (!ensureLicenseManagePermission()) return;
   const nextYear = new Date();
   nextYear.setFullYear(nextYear.getFullYear() + 1);
   document.getElementById('expires_at').value = nextYear.toISOString().split('T')[0];
@@ -86,6 +115,7 @@ export function openLicenseModal() {
 export async function handleCreateLicense(e) {
   console.log('handleCreateLicense called', e);
   e.preventDefault();
+  if (!ensureLicenseManagePermission()) return;
   const formData = new FormData(e.target);
   let data = {
     product_id: formData.get('product_id') || '',
@@ -264,6 +294,15 @@ export async function viewLicense(id) {
 }
 
 async function loadDevicesForLicense(id) {
+  if (!hasPermission(PERMISSIONS.DEVICES_VIEW) && !hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+    const container = document.getElementById('license-devices');
+    if (container) {
+      container.classList.remove('loading');
+      container.textContent = '디바이스를 조회할 권한이 없습니다.';
+    }
+    return;
+  }
+
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/admin/licenses/devices?id=${id}`, { headers: { 'Authorization': `Bearer ${state.token}` } });
     const body = await res.json();
@@ -287,6 +326,7 @@ async function loadDevicesForLicense(id) {
 }
 
 export async function deleteLicense(id) {
+  if (!ensureLicenseManagePermission()) return;
   const ok = await showConfirm('정말로 이 라이선스를 삭제하시겠습니까?', '라이선스 삭제');
   if (!ok) return;
   try {
@@ -322,6 +362,7 @@ export function handleFilter(e) {
 
 // 라이선스 수정 모달 열기
 export async function openEditLicenseModal(licenseId) {
+  if (!ensureLicenseManagePermission()) return;
   try {
     // 라이선스 정보 가져오기
     const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${licenseId}`, {
@@ -398,6 +439,7 @@ async function loadPoliciesForEdit() {
 // 라이선스 수정 처리
 export async function handleEditLicense(e) {
   e.preventDefault();
+  if (!ensureLicenseManagePermission()) return;
   
   const licenseId = document.getElementById('edit_license_id').value;
   const policyId = document.getElementById('edit_policy_select').value;

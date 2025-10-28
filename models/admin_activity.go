@@ -30,6 +30,7 @@ const (
 	AdminActionCreateAdmin       = "create_admin"
 	AdminActionResetPassword     = "reset_password"
 	AdminActionDeleteAdmin       = "delete_admin"
+	AdminActionUpdateAdminPerms  = "update_admin_permissions"
 	AdminActionUploadFile        = "upload_file"
 	AdminActionDeleteFile        = "delete_file"
 	AdminActionDownloadFile      = "download_file"

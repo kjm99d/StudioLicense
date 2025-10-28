@@ -1,7 +1,14 @@
 import { apiFetch, API_BASE_URL } from '../api.js';
 import { openModal, closeModal, showAlert, showConfirm } from '../modals.js';
+import { hasPermission } from '../state.js';
+import { PERMISSIONS } from '../permissions.js';
 
 export function openCleanupModal() {
+  if (!hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+    showAlert('디바이스를 정리할 권한이 없습니다.', '권한 부족');
+    return;
+  }
+
   const modal = document.getElementById('cleanup-modal');
   const daysInput = document.getElementById('cleanup-days');
   if (daysInput) daysInput.value = '90';
@@ -11,6 +18,11 @@ export function openCleanupModal() {
 }
 
 export async function handleCleanupDevices(e) {
+  if (!hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+    await showAlert('디바이스를 정리할 권한이 없습니다.', '권한 부족');
+    return;
+  }
+
   const days = parseInt(document.getElementById('cleanup-days').value);
 
   if (isNaN(days) || days < 0) {

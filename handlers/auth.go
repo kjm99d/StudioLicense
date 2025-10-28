@@ -81,6 +81,24 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if admin.Role == "super_admin" {
+		admin.Permissions = models.AllAdminPermissionKeys()
+	} else {
+		perms, err := utils.GetAdminPermissions(admin.ID)
+		if err != nil {
+			logger.WithFields(map[string]interface{}{
+				"request_id": requestID,
+				"admin_id":   admin.ID,
+				"error":      err.Error(),
+			}).Error("Failed to load admin permissions")
+
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load permissions", err))
+			return
+		}
+		admin.Permissions = perms
+	}
+
 	// JWT 토큰 생성
 	token, expiresAt, err := utils.GenerateToken(admin.ID, admin.Username, admin.Role)
 	if err != nil {
@@ -139,6 +157,18 @@ func GetMe(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Admin not found", err))
 		return
+	}
+
+	if admin.Role == "super_admin" {
+		admin.Permissions = models.AllAdminPermissionKeys()
+	} else {
+		perms, err := utils.GetAdminPermissions(admin.ID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load permissions", err))
+			return
+		}
+		admin.Permissions = perms
 	}
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("Admin retrieved", admin))

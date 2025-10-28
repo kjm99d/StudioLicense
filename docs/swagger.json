@@ -74,6 +74,206 @@
                 }
             }
         },
+        "/api/admin/admins": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "관리자 목록을 조회합니다 (슈퍼 관리자 전용)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 계정"
+                ],
+                "summary": "관리자 목록 조회",
+                "responses": {
+                    "200": {
+                        "description": "조회 성공",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.Admin"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "인증 필요",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 부족",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/admins/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "새로운 서브 관리자를 생성합니다 (슈퍼 관리자 전용)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 계정"
+                ],
+                "summary": "서브 관리자 생성",
+                "parameters": [
+                    {
+                        "description": "생성 정보",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AdminCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "생성 성공",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "잘못된 요청",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "인증 필요",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 부족",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/admins/{admin_id}/permissions": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "특정 관리자의 권한을 업데이트합니다 (슈퍼 관리자 전용)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 계정"
+                ],
+                "summary": "관리자 권한 업데이트",
+                "parameters": [
+                    {
+                        "description": "관리자 ID",
+                        "name": "admin_id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "권한 목록",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AdminPermissionsUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "업데이트 성공",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "잘못된 요청",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "인증 필요",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 부족",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "관리자 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/client-logs": {
             "get": {
                 "security": [
@@ -232,7 +432,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "N일 이상 비활성 상태인 디바이스를 삭제합니다",
+                "description": "N일 이상 비활성 상태인 디바이스를 삭제합니다 (권한: devices.manage, super_admin)",
                 "consumes": [
                     "application/json"
                 ],
@@ -288,7 +488,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "관리자가 특정 디바이스를 강제로 비활성화합니다",
+                "description": "관리자가 특정 디바이스를 강제로 비활성화합니다 (권한: devices.manage)",
                 "consumes": [
                     "application/json"
                 ],
@@ -350,7 +550,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "특정 디바이스를 데이터베이스에서 완전히 삭제합니다",
+                "description": "특정 디바이스를 데이터베이스에서 완전히 삭제합니다 (권한: devices.manage)",
                 "consumes": [
                     "application/json"
                 ],
@@ -412,7 +612,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "특정 디바이스의 활동 로그를 조회합니다",
+                "description": "특정 디바이스의 활동 로그를 조회합니다 (권한: devices.view)",
                 "consumes": [
                     "application/json"
                 ],
@@ -461,7 +661,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "관리자가 비활성화된 디바이스를 다시 활성화합니다",
+                "description": "관리자가 비활성화된 디바이스를 다시 활성화합니다 (권한: devices.manage)",
                 "consumes": [
                     "application/json"
                 ],
@@ -586,10 +786,210 @@
                                             }
                                         }
                                     }
+                    }
+                ]
+            }
+        },
+        "/api/admin/admins/{admin_id}/reset-password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "특정 관리자의 비밀번호를 초기화합니다 (슈퍼 관리자 전용)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 계정"
+                ],
+                "summary": "관리자 비밀번호 초기화",
+                "parameters": [
+                    {
+                        "description": "관리자 ID",
+                        "name": "admin_id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "초기화 성공",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "temp_password": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             ]
                         }
                     },
+                    "401": {
+                        "description": "인증 필요",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 부족",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "관리자 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/admins/{admin_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "특정 관리자 계정을 삭제합니다 (슈퍼 관리자 전용)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 계정"
+                ],
+                "summary": "관리자 삭제",
+                "parameters": [
+                    {
+                        "description": "관리자 ID",
+                        "name": "admin_id",
+                        "in": "path",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "삭제 성공",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "인증 필요",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 부족",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "관리자 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/permissions/catalog": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "부여 가능한 관리자 권한 목록을 조회합니다 (슈퍼 관리자 전용)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "관리자 - 계정"
+                ],
+                "summary": "관리자 권한 카탈로그 조회",
+                "responses": {
+                    "200": {
+                        "description": "조회 성공",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.AdminPermissionDefinition"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "인증 필요",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "권한 부족",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
                     "401": {
                         "description": "인증 필요",
                         "schema": {
@@ -1756,10 +2156,73 @@
                     "description": "admin, superadmin",
                     "type": "string"
                 },
+                "permissions": {
+                    "type": "array",
+                    "description": "허용된 관리자 권한 키 목록",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "updated_at": {
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AdminCreateRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "username": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "username",
+                "email",
+                "password"
+            ]
+        },
+        "models.AdminPermissionsUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "permissions"
+            ]
+        },
+        "models.AdminPermissionDefinition": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
                     "type": "string"
                 }
             }

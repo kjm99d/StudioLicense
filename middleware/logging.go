@@ -169,10 +169,35 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"username":   claims.Username,
 		}).Debug("Admin authenticated")
 
+		permSet := make(map[string]struct{})
+		if claims.Role == "super_admin" {
+			for _, key := range models.AllAdminPermissionKeys() {
+				permSet[key] = struct{}{}
+			}
+		} else {
+			perms, err := utils.GetAdminPermissions(claims.AdminID)
+			if err != nil {
+				logger.WithFields(map[string]interface{}{
+					"request_id": requestID,
+					"admin_id":   claims.AdminID,
+					"error":      err.Error(),
+				}).Error("Failed to load admin permissions")
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load permissions", err))
+				return
+			}
+			for _, perm := range perms {
+				permSet[perm] = struct{}{}
+			}
+		}
+
 		// Context에 관리자 정보 저장
 		ctx := context.WithValue(r.Context(), "admin_id", claims.AdminID)
 		ctx = context.WithValue(ctx, "username", claims.Username)
 		ctx = context.WithValue(ctx, "role", claims.Role)
+		ctx = context.WithValue(ctx, "permissions", permSet)
 
 		// 다음 핸들러 실행
 		next.ServeHTTP(w, r.WithContext(ctx))

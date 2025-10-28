@@ -40,7 +40,7 @@ window.handleLoginForm = async function(event) {
     }
 };
 
-import { state } from './state.js';
+import { state, setPermissions, hasPermission } from './state.js';
 import { apiFetch, API_BASE_URL } from './api.js';
 import { setupModalBehaviors, openModal, closeModal, showAlert, showConfirm } from './modals.js';
 import { formatDate, formatDateTime, debounce } from './utils.js';
@@ -55,6 +55,7 @@ import { loadFiles, openUploadFileModal, initFilesPage } from './pages/files.js'
 import './pages/account.js'; // 비밀번호 변경 (전역 핸들러 등록)
 import './pages/maintenance.js'; // 디바이스 정리 (전역 핸들러 등록)
 import './pages/devices.js'; // 디바이스 관리 (전역 핸들러 등록)
+import { PERMISSIONS } from './permissions.js';
 
 // Expose helpers globally for HTML onclick handlers and cross-module access
 window.apiFetch = apiFetch;
@@ -83,6 +84,17 @@ window.initProductsPage = initProductsPage;
 window.loadFiles = loadFiles;
 window.openUploadFileModal = openUploadFileModal;
 window.handleLogout = handleLogout;
+
+const PAGE_PERMISSIONS = {
+  dashboard: PERMISSIONS.DASHBOARD_VIEW,
+  licenses: PERMISSIONS.LICENSES_VIEW,
+  products: PERMISSIONS.PRODUCTS_VIEW,
+  policies: PERMISSIONS.POLICIES_VIEW,
+  files: PERMISSIONS.FILES_VIEW,
+  'client-logs': PERMISSIONS.CLIENT_LOGS_VIEW,
+};
+
+const NAVIGATION_PRIORITY = ['dashboard', 'licenses', 'products', 'policies', 'files', 'client-logs', 'admins', 'swagger'];
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('📄 DOMContentLoaded event fired');
@@ -120,7 +132,10 @@ function setupEventListeners() {
   
   const createAdminBtn = document.getElementById('create-admin-btn');
   if (createAdminBtn) {
-    createAdminBtn.addEventListener('click', () => {
+    createAdminBtn.addEventListener('click', async () => {
+      if (window.prepareCreateAdminModal) {
+        await window.prepareCreateAdminModal();
+      }
       const modal = document.getElementById('create-admin-modal');
       if (modal) {
         modal._triggerElement = createAdminBtn;
@@ -129,14 +144,23 @@ function setupEventListeners() {
     });
   }
   
-  document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => { 
-    e.preventDefault(); 
-    switchContent(e.target.dataset.page); 
+  document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const page = e.currentTarget.dataset.page;
+    if (!isPageAccessible(page)) {
+      showAlert('이 페이지에 접근할 권한이 없습니다.', '권한 부족');
+      return;
+    }
+    switchContent(page);
   }));
   
   const createLicenseBtn = document.getElementById('create-license-btn');
   if (createLicenseBtn) {
     createLicenseBtn.addEventListener('click', () => {
+      if (!hasPermission(PERMISSIONS.LICENSES_MANAGE)) {
+        showAlert('라이선스를 생성할 권한이 없습니다.', '권한 부족');
+        return;
+      }
       const modal = document.getElementById('license-modal');
       if (modal) modal._triggerElement = createLicenseBtn;
       openLicenseModal();
@@ -144,6 +168,10 @@ function setupEventListeners() {
   }
   
   document.getElementById('create-product-btn')?.addEventListener('click', () => {
+    if (!hasPermission(PERMISSIONS.PRODUCTS_MANAGE)) {
+      showAlert('제품을 생성할 권한이 없습니다.', '권한 부족');
+      return;
+    }
     if (window.openProductModal) {
       window.openProductModal();
     } else {
@@ -152,6 +180,10 @@ function setupEventListeners() {
   });
 
   document.getElementById('cleanup-devices-btn')?.addEventListener('click', () => {
+    if (!hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+      showAlert('디바이스를 정리할 권한이 없습니다.', '권한 부족');
+      return;
+    }
     if (window.openCleanupModal) window.openCleanupModal();
   });
   
@@ -175,7 +207,7 @@ function setupEventListeners() {
     });
   }
 
-  initFilesPage();
+  ensureFilesPageInitialized();
   
   document.getElementById('create-admin-form')?.addEventListener('submit', handleCreateAdmin);
   
@@ -239,12 +271,25 @@ function setupEventListeners() {
           await window.resetAdminPassword(adminId, adminName, target);
         } else if (action === 'delete' && window.deleteAdmin) {
           await window.deleteAdmin(adminId, adminName, target);
+        } else if (action === 'permissions' && window.openManagePermissionsModal) {
+          const permissions = target.dataset.permissions
+            ? target.dataset.permissions
+                .split(',')
+                .map((perm) => perm.trim())
+                .filter(Boolean)
+            : [];
+          await window.openManagePermissionsModal(adminId, adminName, permissions);
         }
       } catch (err) {
         console.error('Admin action failed:', err);
       }
     });
   }
+}
+
+function ensureFilesPageInitialized() {
+  if (!hasPermission(PERMISSIONS.FILES_VIEW)) return;
+  initFilesPage();
 }
 
 function handleLogout() {
@@ -265,11 +310,13 @@ function showDashboard() {
   document.getElementById('dashboard-page').classList.add('active');
   const username = localStorage.getItem('username');
   document.getElementById('user-name').textContent = username || 'Admin';
-  loadDashboardStats();
-  loadRecentActivities();
 }
 
 function switchContent(page) {
+  if (!isPageAccessible(page)) {
+    return;
+  }
+
   document.querySelectorAll('.nav-link').forEach(link => { 
     link.classList.toggle('active', link.dataset.page === page); 
   });
@@ -278,23 +325,79 @@ function switchContent(page) {
 
   // 페이지별 로더
   if (page === 'dashboard') {
-    loadDashboardStats();
-    loadRecentActivities();
+    if (hasPermission(PERMISSIONS.DASHBOARD_VIEW)) {
+      loadDashboardStats();
+      loadRecentActivities();
+    }
   } else if (page === 'licenses') {
-    loadLicenses();
+    if (hasPermission(PERMISSIONS.LICENSES_VIEW)) {
+      loadLicenses();
+    }
   } else if (page === 'admins') {
-    loadAdmins();
+    if (state.currentRole === 'super_admin') {
+      loadAdmins();
+    }
   } else if (page === 'policies') {
-    loadPolicies();
+    if (hasPermission(PERMISSIONS.POLICIES_VIEW)) {
+      loadPolicies();
+    }
   } else if (page === 'products') {
-    initProductsPage();
+    if (hasPermission(PERMISSIONS.PRODUCTS_VIEW)) {
+      initProductsPage();
+    }
   } else if (page === 'files') {
-    loadFiles();
+    if (hasPermission(PERMISSIONS.FILES_VIEW)) {
+      ensureFilesPageInitialized();
+      loadFiles();
+    }
   } else if (page === 'client-logs') {
-    initClientLogsPage();
+    if (hasPermission(PERMISSIONS.CLIENT_LOGS_VIEW)) {
+      initClientLogsPage();
+    }
   } else if (page === 'swagger') {
     // Swagger 페이지는 iframe으로 로드
   }
+}
+
+function applyNavigationPermissions() {
+  document.querySelectorAll('.nav-link').forEach(link => {
+    const page = link.dataset.page;
+    link.style.display = isPageAccessible(page) ? '' : 'none';
+  });
+}
+
+function applyActionPermissions() {
+  const toggle = (id, perm) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = hasPermission(perm) ? '' : 'none';
+  };
+  toggle('create-license-btn', PERMISSIONS.LICENSES_MANAGE);
+  toggle('create-product-btn', PERMISSIONS.PRODUCTS_MANAGE);
+  toggle('upload-file-btn', PERMISSIONS.FILES_MANAGE);
+  toggle('cleanup-devices-btn', PERMISSIONS.DEVICES_MANAGE);
+
+  const policyBtn = document.getElementById('create-policy-btn');
+  if (policyBtn) {
+    policyBtn.style.display = hasPermission(PERMISSIONS.POLICIES_MANAGE) ? '' : 'none';
+  }
+}
+
+function isPageAccessible(page) {
+  if (!page) return true;
+  if (page === 'admins') return state.currentRole === 'super_admin';
+  const required = PAGE_PERMISSIONS[page];
+  if (!required) return true;
+  return hasPermission(required);
+}
+
+function findFirstAccessiblePage() {
+  for (const page of NAVIGATION_PRIORITY) {
+    if (isPageAccessible(page)) {
+      return page;
+    }
+  }
+  return null;
 }
 
 async function fetchMeAndGateUI() {
@@ -305,15 +408,37 @@ async function fetchMeAndGateUI() {
     const body = await res.json();
     
     if (res.ok && body.status === 'success') {
-      state.currentRole = body.data?.role || null;
-      
-      if (state.currentRole === 'super_admin') {
-        const tab = document.getElementById('admins-tab');
-        if (tab) tab.style.display = '';
-      } else {
-        const cleanupBtn = document.getElementById('cleanup-devices-btn');
-        if (cleanupBtn) cleanupBtn.style.display = 'none';
+      const admin = body.data || {};
+      state.currentRole = admin.role || null;
+      setPermissions(admin.permissions || []);
+
+      if (admin.username) {
+        localStorage.setItem('username', admin.username);
+        const nameEl = document.getElementById('user-name');
+        if (nameEl) nameEl.textContent = admin.username;
       }
+
+      applyNavigationPermissions();
+      applyActionPermissions();
+      ensureFilesPageInitialized();
+
+      const activeLink = document.querySelector('.nav-link.active');
+      const currentPage = activeLink?.dataset.page || 'dashboard';
+      if (!isPageAccessible(currentPage)) {
+        const fallback = findFirstAccessiblePage();
+        if (fallback) {
+          switchContent(fallback);
+        } else {
+          showAlert('현재 계정으로 접근 가능한 메뉴가 없습니다. 관리자에게 문의하세요.', '권한 부족');
+        }
+      } else {
+        switchContent(currentPage);
+      }
+    } else {
+      state.currentRole = null;
+      setPermissions([]);
+      applyNavigationPermissions();
+      applyActionPermissions();
     }
   } catch (e) { 
     console.warn('Failed to fetch me:', e); 

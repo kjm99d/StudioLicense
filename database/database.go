@@ -45,6 +45,11 @@ func Initialize(dsn string) error {
 		return fmt.Errorf("failed to ensure super_admin exists: %w", err)
 	}
 
+	// 디바이스 관리 권한 보유자에게 조회 권한을 자동 부여
+	if err := ensureDeviceViewPermissionBackfill(); err != nil {
+		return fmt.Errorf("failed to ensure device view permission: %w", err)
+	}
+
 	// 샘플 제품 생성
 	if err := createSampleProducts(); err != nil {
 		return fmt.Errorf("failed to create sample products: %w", err)
@@ -67,6 +72,17 @@ func createTables() error {
 			role VARCHAR(50) NOT NULL DEFAULT 'admin',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
+		// 관리자 권한 테이블
+		`CREATE TABLE IF NOT EXISTS admin_permissions (
+			admin_id VARCHAR(50) NOT NULL,
+			permission VARCHAR(100) NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (admin_id, permission),
+			INDEX idx_admin_permissions_admin (admin_id),
+			CONSTRAINT fk_admin_permissions_admin FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 제품 테이블
@@ -231,6 +247,16 @@ func createTables() error {
 	}
 
 	return nil
+}
+
+func ensureDeviceViewPermissionBackfill() error {
+	_, err := DB.Exec(`
+		INSERT IGNORE INTO admin_permissions (admin_id, permission, created_at, updated_at)
+		SELECT admin_id, 'devices.view', NOW(), NOW()
+		FROM admin_permissions
+		WHERE permission = 'devices.manage'
+	`)
+	return err
 }
 
 // contains 문자열 포함 여부 확인

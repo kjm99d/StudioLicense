@@ -1,6 +1,8 @@
 import { apiFetch, API_BASE_URL } from '../api.js';
 import { showAlert, showConfirm } from '../modals.js';
 import { formatDate, escapeHtml, safeParseJSON, getValidationWarning, renderDeviceStatusBadge, copyToClipboard } from '../utils.js';
+import { hasPermission } from '../state.js';
+import { PERMISSIONS } from '../permissions.js';
 
 // 디바이스 카드 렌더링
 export function renderDeviceCard(d) {
@@ -9,6 +11,18 @@ export function renderDeviceCard(d) {
   const validationWarning = getValidationWarning(d.last_validated_at);
   const isActive = d.status === 'active';
   const licenseId = d.license_id;
+  const canManageDevices = hasPermission(PERMISSIONS.DEVICES_MANAGE);
+  const canViewDevices = hasPermission(PERMISSIONS.DEVICES_VIEW) || canManageDevices;
+  const manageButton = canManageDevices
+    ? (isActive
+        ? `<button class="btn btn-sm btn-danger" onclick="deactivateDevice('${d.id}', '${escapeHtml(d.device_name)}', '${licenseId}')">비활성화</button>`
+        : `<button class="btn btn-sm btn-success" onclick="reactivateDevice('${d.id}', '${escapeHtml(d.device_name)}', '${licenseId}')">재활성화</button>`
+      )
+    : '';
+  const logsButton = canViewDevices
+    ? `<button class="btn btn-sm" onclick="toggleActivityLogs('${d.id}')">📋 활동 로그</button>`
+    : '';
+  const logsSection = canViewDevices ? `<div style="margin-top: 8px;">${logsButton}</div>` : '';
 
   return `
   <div class="device-card ${isActive ? '' : 'inactive'} card">
@@ -16,10 +30,7 @@ export function renderDeviceCard(d) {
       <div class="device-name">💻 <strong>${escapeHtml(d.device_name || '이름 없음')}</strong></div>
       <div class="device-actions">
         ${statusBadge}
-        ${isActive 
-          ? `<button class="btn btn-sm btn-danger" onclick="deactivateDevice('${d.id}', '${escapeHtml(d.device_name)}', '${licenseId}')">비활성화</button>` 
-          : `<button class="btn btn-sm btn-success" onclick="reactivateDevice('${d.id}', '${escapeHtml(d.device_name)}', '${licenseId}')">재활성화</button>`
-        }
+        ${manageButton}
       </div>
     </div>
     <div class="device-card-body">
@@ -42,9 +53,7 @@ export function renderDeviceCard(d) {
       </div>
       <small>📅 등록: ${formatDate(d.activated_at)}</small>
       <small class="${validationWarning.class}">✅ 검증: ${formatDate(d.last_validated_at)} ${validationWarning.text}</small>
-      <div style="margin-top: 8px;">
-        <button class="btn btn-sm" onclick="toggleActivityLogs('${d.id}')">📋 활동 로그</button>
-      </div>
+      ${logsSection}
       <div id="activity-logs-${d.id}" class="activity-logs" style="display: none;"></div>
     </div>
   </div>`;
@@ -52,6 +61,11 @@ export function renderDeviceCard(d) {
 
 // 디바이스 비활성화
 export async function deactivateDevice(deviceId, deviceName, licenseId) {
+  if (!hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+    await showAlert('디바이스를 관리할 권한이 없습니다.', '권한 부족');
+    return;
+  }
+
   const ok = await showConfirm(
     `"${deviceName}" 디바이스를 비활성화하시겠습니까?\n\n비활성화하면 이 디바이스에서 더 이상 라이선스를 사용할 수 없습니다.`,
     '디바이스 비활성화'
@@ -83,6 +97,11 @@ export async function deactivateDevice(deviceId, deviceName, licenseId) {
 
 // 디바이스 재활성화
 export async function reactivateDevice(deviceId, deviceName, licenseId) {
+  if (!hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+    await showAlert('디바이스를 관리할 권한이 없습니다.', '권한 부족');
+    return;
+  }
+
   const ok = await showConfirm(
     `"${deviceName}" 디바이스를 재활성화하시겠습니까?\n\n재활성화하면 이 디바이스에서 다시 라이선스를 사용할 수 있습니다. (디바이스 슬롯이 남아있어야 합니다)`,
     '디바이스 재활성화'
@@ -114,6 +133,11 @@ export async function reactivateDevice(deviceId, deviceName, licenseId) {
 
 // 활동 로그 토글
 export async function toggleActivityLogs(deviceId) {
+  if (!hasPermission(PERMISSIONS.DEVICES_VIEW) && !hasPermission(PERMISSIONS.DEVICES_MANAGE)) {
+    await showAlert('디바이스 로그를 볼 권한이 없습니다.', '권한 부족');
+    return;
+  }
+
   const logsContainer = document.getElementById(`activity-logs-${deviceId}`);
   if (!logsContainer) return;
   

@@ -1,8 +1,12 @@
-import { state } from '../state.js';
+import { state, hasPermission } from '../state.js';
 import { apiFetch, API_BASE_URL } from '../api.js';
 import { formatDateTime, escapeHtml, formatAdminAction } from '../utils.js';
+import { PERMISSIONS } from '../permissions.js';
 
 export async function loadDashboardStats() {
+  if (!hasPermission(PERMISSIONS.DASHBOARD_VIEW)) {
+    return;
+  }
   try {
     const response = await apiFetch(`${API_BASE_URL}/api/admin/dashboard/stats`, { headers: { 'Authorization': `Bearer ${state.token}` } });
     const data = await response.json();
@@ -19,6 +23,11 @@ export async function loadDashboardStats() {
 }
 
 export async function loadRecentActivities() {
+  if (!hasPermission(PERMISSIONS.DASHBOARD_VIEW)) {
+    const container = document.getElementById('recent-activities');
+    if (container) container.innerHTML = '<p class="loading">활동 내역을 볼 권한이 없습니다.</p>';
+    return;
+  }
   try {
     const type = document.getElementById('activities-type')?.value || '';
     const action = document.getElementById('activities-action')?.value.trim() || '';
