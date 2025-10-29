@@ -29,55 +29,30 @@ definitions:
         type: string
       id:
         type: string
-      role:
-        description: admin, superadmin
-        type: string
       permissions:
-        description: 허용된 관리자 권한 키 목록
         items:
           type: string
         type: array
+      resource_permissions:
+        additionalProperties:
+          $ref: '#/definitions/models.AdminResourcePermissionConfig'
+        type: object
+      role:
+        description: admin, superadmin
+        type: string
       updated_at:
         type: string
       username:
         type: string
     type: object
-  models.AdminCreateRequest:
+  models.AdminResourcePermissionConfig:
     properties:
-      email:
+      mode:
         type: string
-      password:
-        type: string
-      permissions:
+      selected_ids:
         items:
           type: string
         type: array
-      username:
-        type: string
-    required:
-    - username
-    - email
-    - password
-    type: object
-  models.AdminPermissionsUpdateRequest:
-    properties:
-      permissions:
-        items:
-          type: string
-        type: array
-    required:
-    - permissions
-    type: object
-  models.AdminPermissionDefinition:
-    properties:
-      category:
-        type: string
-      description:
-        type: string
-      key:
-        type: string
-      label:
-        type: string
     type: object
   models.ChangePasswordRequest:
     properties:
@@ -196,6 +171,8 @@ definitions:
         type: integer
       created_at:
         type: string
+      created_by:
+        type: string
       customer_email:
         type: string
       customer_name:
@@ -268,6 +245,8 @@ definitions:
     properties:
       created_at:
         type: string
+      created_by:
+        type: string
       id:
         type: string
       policy_data:
@@ -281,6 +260,8 @@ definitions:
   models.Product:
     properties:
       created_at:
+        type: string
+      created_by:
         type: string
       description:
         type: string
@@ -369,253 +350,6 @@ paths:
       summary: 비밀번호 변경
       tags:
       - 인증
-  /api/admin/admins:
-    get:
-      consumes:
-      - application/json
-      description: 관리자 목록을 조회합니다 (슈퍼 관리자 전용)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 조회 성공
-          schema:
-            allOf:
-            - $ref: '#/definitions/models.APIResponse'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/models.Admin'
-                  type: array
-              type: object
-        "401":
-          description: 인증 필요
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "403":
-          description: 권한 부족
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: 관리자 목록 조회
-      tags:
-      - 관리자 - 계정
-  /api/admin/admins/create:
-    post:
-      consumes:
-      - application/json
-      description: 새로운 서브 관리자를 생성합니다 (슈퍼 관리자 전용)
-      parameters:
-      - description: 생성 정보
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/models.AdminCreateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 생성 성공
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "400":
-          description: 잘못된 요청
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "401":
-          description: 인증 필요
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "403":
-          description: 권한 부족
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: 서브 관리자 생성
-      tags:
-      - 관리자 - 계정
-  /api/admin/admins/{admin_id}/permissions:
-    put:
-      consumes:
-      - application/json
-      description: 특정 관리자의 권한을 업데이트합니다 (슈퍼 관리자 전용)
-      parameters:
-      - description: 관리자 ID
-        in: path
-        name: admin_id
-        required: true
-        type: string
-      - description: 권한 목록
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/models.AdminPermissionsUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 업데이트 성공
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "400":
-          description: 잘못된 요청
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "401":
-          description: 인증 필요
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "403":
-          description: 권한 부족
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "404":
-          description: 관리자 없음
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: 관리자 권한 업데이트
-      tags:
-      - 관리자 - 계정
-  /api/admin/admins/{admin_id}/reset-password:
-    post:
-      consumes:
-      - application/json
-      description: 특정 관리자의 비밀번호를 초기화합니다 (슈퍼 관리자 전용)
-      parameters:
-      - description: 관리자 ID
-        in: path
-        name: admin_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 초기화 성공
-          schema:
-            allOf:
-            - $ref: '#/definitions/models.APIResponse'
-            - properties:
-                data:
-                  properties:
-                    temp_password:
-                      type: string
-                  type: object
-              type: object
-        "401":
-          description: 인증 필요
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "403":
-          description: 권한 부족
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "404":
-          description: 관리자 없음
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: 관리자 비밀번호 초기화
-      tags:
-      - 관리자 - 계정
-  /api/admin/admins/{admin_id}:
-    delete:
-      consumes:
-      - application/json
-      description: 특정 관리자 계정을 삭제합니다 (슈퍼 관리자 전용)
-      parameters:
-      - description: 관리자 ID
-        in: path
-        name: admin_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 삭제 성공
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "401":
-          description: 인증 필요
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "403":
-          description: 권한 부족
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "404":
-          description: 관리자 없음
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: 관리자 삭제
-      tags:
-      - 관리자 - 계정
-  /api/admin/permissions/catalog:
-    get:
-      consumes:
-      - application/json
-      description: 부여 가능한 관리자 권한 목록을 조회합니다 (슈퍼 관리자 전용)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 조회 성공
-          schema:
-            allOf:
-            - $ref: '#/definitions/models.APIResponse'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/models.AdminPermissionDefinition'
-                  type: array
-              type: object
-        "401":
-          description: 인증 필요
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "403":
-          description: 권한 부족
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-        "500":
-          description: 서버 에러
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: 관리자 권한 카탈로그 조회
-      tags:
-      - 관리자 - 계정
   /api/admin/client-logs:
     get:
       consumes:
@@ -717,7 +451,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: N일 이상 비활성 상태인 디바이스를 삭제합니다 (권한: devices.manage, super_admin)
+      description: N일 이상 비활성 상태인 디바이스를 삭제합니다
       parameters:
       - description: 비활성 기간 (일)
         in: body
@@ -752,7 +486,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 관리자가 특정 디바이스를 강제로 비활성화합니다 (권한: devices.manage)
+      description: 관리자가 특정 디바이스를 강제로 비활성화합니다
       parameters:
       - description: 디바이스 ID
         in: body
@@ -791,7 +525,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 특정 디바이스를 데이터베이스에서 완전히 삭제합니다 (권한: devices.manage)
+      description: 특정 디바이스를 데이터베이스에서 완전히 삭제합니다
       parameters:
       - description: 디바이스 ID
         in: body
@@ -830,7 +564,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: 특정 디바이스의 활동 로그를 조회합니다 (권한: devices.view)
+      description: 특정 디바이스의 활동 로그를 조회합니다
       parameters:
       - description: 디바이스 ID
         in: query
@@ -861,7 +595,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 관리자가 비활성화된 디바이스를 다시 활성화합니다 (권한: devices.manage)
+      description: 관리자가 비활성화된 디바이스를 다시 활성화합니다
       parameters:
       - description: 디바이스 ID
         in: body
@@ -1356,6 +1090,10 @@ paths:
           description: 인증 필요
           schema:
             $ref: '#/definitions/models.APIResponse'
+        "409":
+          description: 중복 제품명
+          schema:
+            $ref: '#/definitions/models.APIResponse'
         "500":
           description: 서버 에러
           schema:
@@ -1385,6 +1123,10 @@ paths:
             $ref: '#/definitions/models.APIResponse'
         "400":
           description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 제품 없음
           schema:
             $ref: '#/definitions/models.APIResponse'
         "409":
@@ -1426,8 +1168,16 @@ paths:
           description: 잘못된 요청
           schema:
             $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: 권한 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
         "404":
           description: 제품 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: 서버 에러
           schema:
             $ref: '#/definitions/models.APIResponse'
       security:
@@ -1460,6 +1210,14 @@ paths:
             $ref: '#/definitions/models.APIResponse'
         "400":
           description: 잘못된 요청
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: 제품 없음
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "409":
+          description: 중복 제품명
           schema:
             $ref: '#/definitions/models.APIResponse'
         "500":

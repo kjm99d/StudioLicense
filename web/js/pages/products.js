@@ -13,7 +13,6 @@ let currentProductFileMappings = [];
 let availableFileAssets = [];
 let currentProductFilesFilter = '';
 let currentProductFilesRoot = null;
-let activeProductFilesRow = null;
 let activeProductFilesButton = null;
 
 function getProductFilesElement(role) {
@@ -21,7 +20,7 @@ function getProductFilesElement(role) {
     return currentProductFilesRoot.querySelector(`[data-role="${role}"]`);
 }
 
-function updateManageButtonState(productId, isExpanded) {
+function updateManageButtonState(productId, isExpanded, triggerEl) {
     if (activeProductFilesButton) {
         activeProductFilesButton.classList.remove('is-active');
         activeProductFilesButton.setAttribute('aria-expanded', 'false');
@@ -30,7 +29,7 @@ function updateManageButtonState(productId, isExpanded) {
 
     if (!isExpanded) return;
 
-    const button = document.querySelector(`button[data-role="product-manage-files"][data-product-id="${productId}"]`);
+    const button = triggerEl || document.querySelector(`button[data-role="product-manage-files"][data-product-id="${productId}"]`);
     if (button) {
         button.classList.add('is-active');
         button.setAttribute('aria-expanded', 'true');
@@ -39,8 +38,18 @@ function updateManageButtonState(productId, isExpanded) {
 }
 
 function collapseProductFilesPanel() {
-    if (activeProductFilesRow?.parentElement) {
-        activeProductFilesRow.remove();
+    const modal = document.getElementById('product-files-modal');
+    if (modal && modal.classList.contains('active')) {
+        closeModal(modal);
+    } else {
+        resetProductFilesState();
+    }
+}
+
+function resetProductFilesState() {
+    const modalBody = document.querySelector('#product-files-modal .product-files-modal-content');
+    if (modalBody) {
+        modalBody.innerHTML = '';
     }
     if (activeProductFilesButton) {
         activeProductFilesButton.classList.remove('is-active');
@@ -51,7 +60,7 @@ function collapseProductFilesPanel() {
     currentProductFilesProductName = '';
     currentProductFilesFilter = '';
     currentProductFilesRoot = null;
-    activeProductFilesRow = null;
+    currentProductFileMappings = [];
 }
 
 function buildProductFilesPanelMarkup(productName = '') {
@@ -64,9 +73,6 @@ function buildProductFilesPanelMarkup(productName = '') {
                     <span class="panel-subtitle">선택한 제품</span>
                     <h3 class="product-files-target-name" data-role="product-files-target-name">${safeName || '제품을 선택하세요'}</h3>
                 </div>
-                <button type="button" class="product-files-close-btn" aria-label="닫기" data-role="product-files-close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
             </div>
             <div class="product-files-top">
                 <form class="product-file-form" data-role="product-file-form">
@@ -169,11 +175,6 @@ function attachProductFilesPanelEvents() {
         });
     }
 
-    const closeBtn = getProductFilesElement('product-files-close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => collapseProductFilesPanel());
-    }
-
     const searchInput = getProductFilesElement('product-file-search');
     if (searchInput) {
         searchInput.addEventListener('input', handleProductFilesSearch);
@@ -243,12 +244,12 @@ function renderProductsTable(products) {
             <td>${createdDate}</td>
             <td style="white-space: nowrap;">
                 <button
-                    class="btn btn-sm grey lighten-2"
+                    class="btn btn-sm product-files-manage-btn blue darken-1 white-text"
                     data-role="product-manage-files"
                     data-product-id="${escapeHtml(productId)}"
                     data-product-name="${escapeHtml(productName)}"
                     aria-expanded="false"
-                    onclick="manageProductFiles(this.dataset.productId, this.dataset.productName)">
+                    onclick="manageProductFiles(this.dataset.productId, this.dataset.productName, this)">
                     파일 관리
                 </button>
                 <button class="btn btn-sm btn-primary" onclick="editProduct('${product.id}')">수정</button>
@@ -794,50 +795,60 @@ function populateProductFileForm(mapping) {
     }
 }
 
-async function manageProductFiles(productId, productName) {
+async function manageProductFiles(productId, productName, triggerEl) {
     if (!productId) return;
 
     const targetId = String(productId);
+    const modal = document.getElementById('product-files-modal');
+    if (!modal) return;
 
-    if (currentProductFilesProductId === targetId && currentProductFilesRoot) {
+    if (!modal._productFilesEventsBound) {
+        modal.addEventListener('modal:closed', resetProductFilesState);
+        modal._productFilesEventsBound = true;
+    }
+
+    const isModalOpen = modal.classList.contains('active');
+    if (isModalOpen && currentProductFilesProductId === targetId) {
         collapseProductFilesPanel();
         return;
     }
 
-    const tableBody = document.getElementById('products-table');
-    if (!tableBody) return;
+    const modalBody = modal.querySelector('[data-role="product-files-modal-body"]');
+    if (!modalBody) return;
 
-    collapseProductFilesPanel();
-
-    const hostRow = Array.from(tableBody.querySelectorAll('tr')).find((tr) => tr.dataset.productId === targetId);
-    if (!hostRow) return;
-
-    const detailRow = document.createElement('tr');
-    detailRow.className = 'product-files-detail-row';
-    detailRow.dataset.productFilesRow = targetId;
-
-    const detailCell = document.createElement('td');
-    detailCell.colSpan = hostRow.children.length || 5;
-    detailCell.innerHTML = buildProductFilesPanelMarkup(productName);
-    detailRow.appendChild(detailCell);
-
-    hostRow.insertAdjacentElement('afterend', detailRow);
-
-    currentProductFilesRoot = detailCell.querySelector('[data-role="product-files-root"]');
-    activeProductFilesRow = detailRow;
     currentProductFilesProductId = targetId;
     currentProductFilesProductName = productName || '';
     currentProductFilesFilter = '';
     currentProductFileMappings = [];
 
+    modalBody.innerHTML = buildProductFilesPanelMarkup(productName);
+    currentProductFilesRoot = modalBody.querySelector('[data-role="product-files-root"]');
+    const scroller = modal.querySelector('.product-files-modal-body');
+    if (scroller) {
+        scroller.scrollTop = 0;
+    }
+
+    const trigger = triggerEl instanceof HTMLElement ? triggerEl : document.querySelector(`button[data-role="product-manage-files"][data-product-id="${targetId}"]`);
+    updateManageButtonState(targetId, true, trigger);
+
+    if (trigger instanceof HTMLElement) {
+        modal._triggerElement = trigger;
+    }
+
     attachProductFilesPanelEvents();
     resetProductFileForm();
     renderProductFilesSummary();
     renderProductFilesLoading();
-    updateManageButtonState(targetId, true);
 
-    await loadAvailableFileAssets();
-    await loadProductFileMappings(targetId);
+    openModal(modal);
+
+    try {
+        await loadAvailableFileAssets();
+        await loadProductFileMappings(targetId);
+    } catch (error) {
+        console.error('Failed to load product files:', error);
+        await showAlert('제품 파일 정보를 불러오는 중 문제가 발생했습니다.', '오류');
+    }
 }
 
 async function handleProductFileSubmit(event) {

@@ -1289,6 +1289,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
+                    "409": {
+                        "description": "중복 제품명",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
                     "500": {
                         "description": "서버 에러",
                         "schema": {
@@ -1350,8 +1356,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
+                    "403": {
+                        "description": "권한 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
                     "404": {
                         "description": "제품 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "서버 에러",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
@@ -1406,6 +1424,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.APIResponse"
                         }
                     },
+                    "404": {
+                        "description": "제품 없음",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "중복 제품명",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
                     "500": {
                         "description": "서버 에러",
                         "schema": {
@@ -1449,6 +1479,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "잘못된 요청",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "제품 없음",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
@@ -1758,6 +1794,18 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resource_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/models.AdminResourcePermissionConfig"
+                    }
+                },
                 "role": {
                     "description": "admin, superadmin",
                     "type": "string"
@@ -1767,6 +1815,20 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "models.AdminResourcePermissionConfig": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1942,6 +2004,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "created_by": {
+                    "type": "string"
+                },
                 "customer_email": {
                     "type": "string"
                 },
@@ -2051,6 +2116,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "created_by": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -2070,6 +2138,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
                     "type": "string"
                 },
                 "description": {

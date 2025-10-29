@@ -77,6 +77,8 @@ export function openModal(modal) {
     }
   };
   modal.addEventListener('keydown', modal._trap);
+
+  modal.dispatchEvent(new CustomEvent('modal:opened', { bubbles: true }));
 }
 
 export function closeModal(modal) {
@@ -103,6 +105,8 @@ export function closeModal(modal) {
     modal._triggerElement.focus();
     delete modal._triggerElement;
   }
+
+  modal.dispatchEvent(new CustomEvent('modal:closed', { bubbles: true }));
 }
 
 export function openDialog({ title = '알림', message = '', showCancel = false }) {

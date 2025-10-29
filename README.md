@@ -1,76 +1,97 @@
 # Studio License Server
 
-스튜디오 라이선스 서버는 소프트웨어 라이선스를 손쉽게 발급·관리하기 위한 Go 기반 백엔드와 현대적인 웹 대시보드를 제공하는 프로젝트입니다.  
-Productos, 정책, 디바이스, 관리자에 대한 CRUD와 감사 로그, Swagger 기반의 REST API 문서를 포함하고 있습니다.
+> 하드웨어 지문 기반 소프트웨어 라이선스를 발급·배포·감사하는 풀스택 솔루션  
+> Go 1.21 + MySQL 8 + ES6 모듈 프런트엔드
+
+---
+
+## 목차
+
+1. [프로젝트 개요](#프로젝트-개요)  
+2. [주요 기능](#주요-기능)  
+3. [아키텍처 한눈에 보기](#아키텍처-한눈에-보기)  
+4. [시작하기](#시작하기)  
+5. [환경 변수 및 설정](#환경-변수-및-설정)  
+6. [실행 및 스크립트](#실행-및-스크립트)  
+7. [디렉터리 구조](#디렉터리-구조)  
+8. [개발 워크플로](#개발-워크플로)  
+9. [기여 가이드](#기여-가이드)
+
+---
+
+## 프로젝트 개요
+
+Studio License Server는 SaaS / 온프레미스 환경에서 **제품·정책·라이선스·디바이스**를 통합 관리하기 위한 관리 콘솔과 REST API를 제공합니다.  
+RBAC 기반의 관리자 권한 모델과 세밀한 리소스 허용 범위(제품/정책/라이선스)를 지원하며, 모든 활동을 감사 로그로 남깁니다.
 
 ---
 
 ## 주요 기능
 
-### 관리자 기능
-- Super Admin / Admin 계층 구조와 RBAC(Role-Based Access Control)
-- 서브 관리자 생성·비활성화·비밀번호 초기화
-- 모든 관리자 활동에 대한 세부 로그 기록
+### 👥 관리자 / RBAC
+- Super Admin / Admin 역할 분리
+- 기능 권한 + 리소스(제품·정책·라이선스) 범위 지정
+- 관리자 활동(생성·수정·삭제·로그인 등) 감사 로그
 
-### 라이선스 관리
-- 라이선스 생성 / 조회 / 수정 / 삭제 / 폐기
-- 제품·정책과 연계된 라이선스 발급
-- 상태(활성, 만료, 폐기) 및 디바이스 할당량 실시간 추적
-- 스케줄러를 통한 만료 라이선스 자동 처리
+### 🎫 라이선스 & 정책
+- 라이선스 CRUD, 폐기, 만료 스케줄링
+- 제품/정책과 연동된 라이선스 발급
+- 정책 JSON 편집기(폼/JSON 양식 전환)
 
-### 정책 관리
-- JSON 기반 정책 정의 및 버전 관리
-- 정책 CRUD 및 라이선스와의 매핑
-- 정책 변경에 대한 감사 로그 자동 기록
+### 📦 제품 & 파일 배포
+- 제품 CRUD
+- 제품 전용 파일 관리 (모달 UI + 외부 링크 지원)
+- 제품-파일 매핑 및 정렬, 사용자 노출명 관리
 
-### 디바이스 관리
-- 하드웨어 지문을 이용한 디바이스 활성화
-- 디바이스 비활성화/재활성화 API 제공
-- 디바이스 활동 로그 및 청소(Cleanup) 작업
+### 💻 디바이스 & 로그
+- 하드웨어 지문 기반 활성화/비활성화 API
+- 디바이스 활동 로그 조회 및 청소 스케줄러
+- 클라이언트 측 로그 업로드 엔드포인트
 
-### 로깅 · 관측성
-- 라이선스·디바이스 지표 요약 대시보드
-- 관리자/디바이스 활동 로그
-- 클라이언트 애플리케이션 로그 수집 엔드포인트
-- 다중 출력 및 로테이션을 지원하는 구조화 로거
+### 📊 대시보드 & 모니터링
+- 라이선스/디바이스 요약 지표
+- 최근 활동 / 경고 카드
+- 모든 API에 Swagger 자동 문서화 제공
 
 ---
 
-## 요구 사항
-
-- Go 1.21 이상
-- MySQL 8.0 이상
-- ES6 모듈을 지원하는 최신 브라우저 (관리자 대시보드용)
-
----
-
-## 디렉터리 구조
+## 아키텍처 한눈에 보기
 
 ```
-├── database/           # DB 초기화 및 헬퍼
-├── handlers/           # REST API 핸들러
-├── logger/             # 구조화 로거 및 로테이션
-├── middleware/         # 인증/권한/로깅 미들웨어
-├── models/             # DTO 및 상수 정의
-├── scheduler/          # 백그라운드 작업 (만료 체크)
-├── utils/              # 공용 유틸리티 (암호화, 시간 등)
-├── web/                # 웹 대시보드 (index.html, JS 모듈)
-└── docs/               # Swagger 문서
+┌─────────────┐
+│  web/       │  ES6 모듈 기반 SPA (Materialize 커스텀)
+│  ├─ index   │  모달, 탭, 검색 필터 UI
+│  └─ js/     │  페이지/컴포넌트/서비스 모듈
+└──────┬──────┘
+       │ REST API
+┌──────▼──────┐
+│  handlers/  │  HTTP 핸들러 (입력검증, 응답 포맷)
+├──────┬──────┤
+│ services/   │  비즈니스 로직 (DB 인터페이스, 리소스 권한)
+├──────┬──────┤
+│ database/   │  MySQL 초기화, 마이그레이션, 샘플 데이터
+└──────┴──────┘
+       │
+┌──────▼──────┐
+│  MySQL 8+   │
+└─────────────┘
 ```
+
+- **services/**: 최근 도입된 레이어로, 제품 관리·리소스 권한·스코프 계산을 담당합니다. 핸들러는 인터페이스에만 의존하므로 테스트/교체가 쉬워졌습니다.
+- **handlers/resource_access.go**: 주입형 `ResourceScopeResolver`를 사용해 super admin과 커스텀 스코프를 구분합니다.
+- **web/js/pages/products.js**: 제품 파일 관리가 테이블 확장 패널 → 모달 구조로 리팩터링되어, UI 가시성과 상태 초기화가 개선되었습니다.
 
 ---
 
-## 로컬 개발 환경 준비
+## 시작하기
 
 ### 1. 저장소 클론
-```powershell
+```bash
 git clone https://github.com/your-org/StudioLicense.git
 cd StudioLicense
 ```
 
-### 2. PowerShell UTF-8 설정 (권장)
-Windows PowerShell에서는 한글이 깨지는 것을 방지하기 위해 세션 시작 시 아래 명령을 실행하세요.
-
+### 2. PowerShell UTF-8 환경 (옵션이지만 권장)
 ```powershell
 chcp 65001 > $null
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
@@ -79,68 +100,101 @@ $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 ```
 
 ### 3. 의존성 설치
-```powershell
+```bash
 go mod tidy
 ```
 
-### 4. 데이터베이스 설정
-- `studiolicense` 데이터베이스를 MySQL에 생성합니다.
-- 필요 시 `main.go`의 DSN을 환경에 맞게 수정하세요.
-  ```
-  root:root@tcp(localhost:3306)/studiolicense?parseTime=true&loc=Asia%2FSeoul
-  ```
-- 첫 실행 시 테이블과 기본 Super Admin(`admin` / `admin123`) 계정이 자동으로 생성됩니다.
+### 4. 데이터베이스 준비
+1. MySQL 8.0 이상 실행
+2. `studiolicense` 데이터베이스 생성
+3. `main.go`의 DSN이 환경과 일치하는지 확인  
+   기본값: `root:root@tcp(localhost:3306)/studiolicense?parseTime=true&loc=Asia%2FSeoul`
+4. 서버 첫 실행 시 테이블/인덱스/샘플 데이터, 
+   기본 Super Admin 계정(`admin` / `admin123`)이 자동 생성됩니다.
 
 ### 5. 서버 실행
-```powershell
+```bash
 go run main.go
 ```
 
-관리자 대시보드: **http://localhost:8080/web/**  
-API 문서(Swagger): **http://localhost:8080/swagger/index.html**
+- 관리자 대시보드: <http://localhost:8080/web/>
+- Swagger UI: <http://localhost:8080/swagger/index.html>
 
 ---
 
-## 테스트 실행
+## 환경 변수 및 설정
 
-```powershell
+| 변수 | 기본값 | 설명 |
+| ---- | ------ | ---- |
+| `MYSQL_DSN` | `root:root@tcp(localhost:3306)/studiolicense?parseTime=true&loc=Asia%2FSeoul` | 데이터베이스 연결 정보 |
+| `LOG_LEVEL` | `INFO` | `DEBUG/INFO/WARN/ERROR` |
+| `LOG_DIR` | `./logs` | 로그 파일 저장 경로 |
+| `JWT_SECRET` | (필수) | 관리자 인증 토큰 서명 키 |
+
+> **TIP**: `.env` 파일을 사용하지 않고 Go 환경변수나 Docker Compose를 통해 주입하는 방식을 추천합니다.
+
+---
+
+## 실행 및 스크립트
+
+```bash
+# 서버 실행
+go run main.go
+
+# 전체 테스트
 go test ./...
+
+# Swagger 문서 재생성 (swaggo 설치 필요)
+swag init -g main.go
 ```
 
 ---
 
-## 로그 · 타임존
+## 디렉터리 구조
 
-- 모든 일시는 Asia/Seoul 타임존을 기준으로 `DATETIME` 컬럼에 저장됩니다.
-- `utils/time.go`에서 시간 파싱/포맷을 일원화하고 있습니다.
-- 로그는 콘솔과 `/logs/server-YYYY-MM-DD.log` 파일에 동시 기록되며, 로테이션 및 보관 기간은 `logger.Config`로 조정 가능합니다.
-
----
-
-## API 추가 가이드
-
-1. `models/`에 데이터 모델 정의
-2. `handlers/`에 비즈니스 로직 및 핸들러 작성
-3. `main.go`에 라우팅 등록
-4. Swagger 주석(`@Summary`, `@Description` 등) 추가
-
-## 웹 대시보드 확장
-
-1. `web/js/pages/`에 새로운 페이지 모듈 추가
-2. `web/index.html`에 필요한 구조물/모달 추가
-3. `web/js/main.js`에서 모듈을 import 및 초기화
-4. 필요에 따라 공통 유틸/컴포넌트 확장
+```
+├── database/                   # DB 초기화 및 샘플 데이터
+├── handlers/                   # HTTP 핸들러 (입력 검증 · 시리얼라이즈)
+├── logger/                     # 구조화 로거, 파일 로테이션
+├── middleware/                 # Auth, RBAC, 로깅, CORS
+├── models/                     # DTO, 상수, Enum
+├── scheduler/                  # 만료 라이선스/디바이스 정리 작업
+├── services/                   # 비즈니스 로직 (제품/권한/스코프)
+├── utils/                      # 공용 함수 (암호화, 시간, ID 등)
+├── web/                        # 관리자 웹 대시보드
+│   ├── index.html              # SPA 엔트리
+│   ├── styles.css              # 커스텀 스타일
+│   └── js/                     # ES6 페이지/컴포넌트/서비스 모듈
+└── docs/                       # Swagger JSON/YAML
+```
 
 ---
 
-## 기여 방법
+## 개발 워크플로
 
-1. 저장소를 포크하고 브랜치를 생성합니다.  
-   `git checkout -b feature/awesome-feature`
-2. 변경 사항을 커밋합니다.  
-   `git commit -m "Add awesome feature"`
-3. 테스트를 실행합니다.  
-   `go test ./...`
-4. 포크한 저장소에 푸시 후 Pull Request를 생성합니다.
+1. **feature 브랜치 생성**  
+   `git checkout -b feature/add-x`
+2. **변경 & 자동화**  
+   - 핸들러 추가 → 서비스에 비즈니스 로직 구현  
+   - Swagger 주석(`@Summary`, `@Tags`, `@Router`) 유지
+3. **테스트**  
+   `go test ./...`  
+   서비스 레이어는 인터페이스 기반이라 단위 테스트를 작성하기 쉽습니다.
+4. **빌드 검증**  
+   `go build ./...`
+5. **PR 생성 시 체크리스트**  
+   - [ ] 테스트 통과
+   - [ ] Swagger 문서 최신 상태
+   - [ ] README 또는 docs 업데이트 (필요 시)
+   - [ ] UI 변경은 스크린샷 첨부
 
-문제나 개선 제안은 Issues 탭을 이용해 주세요.
+---
+
+## 기여 가이드
+
+1. Issue 또는 Discussion으로 개선 아이디어/버그를 공유합니다.  
+2. Fork → Branch → Commit → Pull Request 순으로 진행합니다.
+3. 커밋 메시지는 **한국어/영어 혼용 가능**, 단 의미가 명확하도록 작성합니다.
+4. 대규모 변경(PR)에는 테스트 전략 및 회귀 검증 방법을 기술해주세요.
+
+감사합니다! 문제가 있거나 새로운 기능 아이디어가 있다면 언제든지 Issue를 열어 주세요.
