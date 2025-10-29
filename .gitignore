@@ -8,6 +8,7 @@
 # Build output
 server
 server.exe
+data/
 
 # Test binary, built with `go test -c`
 *.test
