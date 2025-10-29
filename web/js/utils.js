@@ -48,6 +48,7 @@ export function formatAdminAction(action) {
     'create_admin': '관리자 생성',
     'reset_password': '비밀번호 초기화',
     'delete_admin': '관리자 삭제',
+    'update_admin_permissions': '관리자 권한 수정',
     'upload_file': '파일 업로드',
     'delete_file': '파일 삭제',
     'download_file': '파일 다운로드',
