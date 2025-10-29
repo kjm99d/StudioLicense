@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,11 +14,14 @@ import (
 	"studiolicense/middleware"
 	"studiolicense/models"
 	"studiolicense/scheduler"
+	"studiolicense/services"
 	"syscall"
 	"time"
 
 	httpSwagger "github.com/swaggo/http-swagger"
 )
+
+var productHTTPHandler *handlers.ProductHandler
 
 // @title Studio License Server API
 // @version 1.0
@@ -65,6 +69,17 @@ func main() {
 		logger.Fatal("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
+
+	// 서비스 계층 초기화
+	sqlExecutor := services.NewSQLExecutor(database.DB)
+	adminResourceService := services.NewAdminResourcePermissionService(sqlExecutor)
+	scopeResolver := services.NewResourceScopeResolver(adminResourceService)
+
+	handlers.SetResourceScopeResolver(scopeResolver)
+	handlers.SetAdminResourcePermissionService(adminResourceService)
+
+	productService := services.NewProductService(sqlExecutor)
+	productHTTPHandler = handlers.NewProductHandler(productService, scopeResolver)
 
 	// 스케줄러 시작 (만료된 라이선스 자동 처리)
 	scheduler.StartScheduler()
@@ -479,17 +494,23 @@ func licenseDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 // productHandler 제품 목록/생성 핸들러
 func productHandler(w http.ResponseWriter, r *http.Request) {
+	if productHTTPHandler == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("product handler not initialized", nil))
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		if !middleware.EnsurePermission(w, r, models.PermissionProductsView) {
 			return
 		}
-		handlers.GetProducts(w, r)
+		productHTTPHandler.List(w, r)
 	case http.MethodPost:
 		if !middleware.EnsurePermission(w, r, models.PermissionProductsManage) {
 			return
 		}
-		handlers.CreateProduct(w, r)
+		productHTTPHandler.Create(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -497,22 +518,28 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 
 // productDetailHandler 제품 상세/수정/삭제 핸들러
 func productDetailHandler(w http.ResponseWriter, r *http.Request) {
+	if productHTTPHandler == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("product handler not initialized", nil))
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		if !middleware.EnsurePermission(w, r, models.PermissionProductsView) {
 			return
 		}
-		handlers.GetProduct(w, r)
+		productHTTPHandler.Get(w, r)
 	case http.MethodPut:
 		if !middleware.EnsurePermission(w, r, models.PermissionProductsManage) {
 			return
 		}
-		handlers.UpdateProduct(w, r)
+		productHTTPHandler.Update(w, r)
 	case http.MethodDelete:
 		if !middleware.EnsurePermission(w, r, models.PermissionProductsManage) {
 			return
 		}
-		handlers.DeleteProduct(w, r)
+		productHTTPHandler.Delete(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

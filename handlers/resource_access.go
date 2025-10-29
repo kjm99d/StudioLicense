@@ -1,27 +1,26 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
-	"strings"
+
 	"studiolicense/models"
-	"studiolicense/utils"
+	"studiolicense/services"
 )
+
+var scopeResolver services.ResourceScopeResolver = services.NoopResourceScopeResolver{}
+
+// SetResourceScopeResolver는 핸들러에서 사용할 리소스 스코프 해석기를 주입합니다.
+func SetResourceScopeResolver(resolver services.ResourceScopeResolver) {
+	if resolver == nil {
+		scopeResolver = services.NoopResourceScopeResolver{}
+		return
+	}
+	scopeResolver = resolver
+}
 
 func resolveResourceScope(r *http.Request, resourceType string) (models.AdminResourcePermissionConfig, bool, string, error) {
 	role, _ := r.Context().Value("role").(string)
-	if strings.EqualFold(role, "super_admin") {
-		return models.AdminResourcePermissionConfig{Mode: models.ResourceModeAll}, true, "", nil
-	}
-
 	adminID, _ := r.Context().Value("admin_id").(string)
-	if strings.TrimSpace(adminID) == "" {
-		return models.AdminResourcePermissionConfig{}, false, "", errors.New("missing admin id in context")
-	}
-
-	scope, err := utils.GetAdminResourceScope(adminID, resourceType)
-	if err != nil {
-		return models.AdminResourcePermissionConfig{}, false, "", err
-	}
-	return scope, false, adminID, nil
+	scope, isSuper, err := scopeResolver.Resolve(r.Context(), role, adminID, resourceType)
+	return scope, isSuper, adminID, err
 }

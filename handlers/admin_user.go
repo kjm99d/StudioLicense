@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"studiolicense/database"
 	"studiolicense/logger"
 	"studiolicense/models"
+	"studiolicense/services"
 	"studiolicense/utils"
 )
 
@@ -18,6 +20,20 @@ type AdminCreateRequest struct {
 	Password string `json:"password"`
 }
 
+func loadResourcePermissions(ctx context.Context, adminID string) (map[string]models.AdminResourcePermissionConfig, error) {
+	if adminResourcePermissionService != nil {
+		return adminResourcePermissionService.GetPermissions(ctx, adminID)
+	}
+	return utils.GetAdminResourcePermissions(adminID)
+}
+
+func saveResourcePermissions(ctx context.Context, adminID string, payload map[string]models.AdminResourcePermissionConfig) (map[string]models.AdminResourcePermissionConfig, error) {
+	if adminResourcePermissionService != nil {
+		return adminResourcePermissionService.SetPermissions(ctx, adminID, payload)
+	}
+	return utils.SetAdminResourcePermissions(adminID, payload)
+}
+
 // AdminPermissionsUpdateRequest 관리자 권한 갱신 요청
 type AdminPermissionsUpdateRequest struct {
 	Permissions         []string                                        `json:"permissions"`
@@ -25,6 +41,13 @@ type AdminPermissionsUpdateRequest struct {
 }
 
 var emailRegex = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+
+var adminResourcePermissionService services.AdminResourcePermissionService
+
+// SetAdminResourcePermissionService는 관리자 리소스 권한 서비스를 주입한다.
+func SetAdminResourcePermissionService(svc services.AdminResourcePermissionService) {
+	adminResourcePermissionService = svc
+}
 
 // ListAdmins 관리자 목록 조회 (super_admin 전용)
 func ListAdmins(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +79,7 @@ func ListAdmins(w http.ResponseWriter, r *http.Request) {
 			a.Permissions = perms
 		}
 
-		resourcePerms, err := utils.GetAdminResourcePermissions(a.ID)
+		resourcePerms, err := loadResourcePermissions(r.Context(), a.ID)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load resource permissions", err))
@@ -163,7 +186,7 @@ func CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resourcePerms, err := utils.GetAdminResourcePermissions(id)
+	resourcePerms, err := loadResourcePermissions(r.Context(), id)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load resource permissions", err))
@@ -244,7 +267,7 @@ func UpdateAdminPermissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resourcePerms, err := utils.SetAdminResourcePermissions(adminID, req.ResourcePermissions)
+	resourcePerms, err := saveResourcePermissions(r.Context(), adminID, req.ResourcePermissions)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to assign resource permissions", err))
