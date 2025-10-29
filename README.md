@@ -3,6 +3,8 @@
 > 하드웨어 핑거프린트 기반 소프트웨어 라이선스를 발급·배포·감사하는 풀스택 솔루션  
 > Go 1.21 + MySQL 8 + ES6 모듈 프런트엔드 + Swagger + JWT
 
+![Project Preview](https://github.com/kjm99d/StudioLicense/blob/master/asset/preview.gif)
+
 ---
 
 ## 목차
