@@ -16,6 +16,7 @@ type License struct {
 	ActiveDevices int     `json:"active_devices" db:"active_devices"` // 활성 디바이스 수
 	ExpiresAt     string  `json:"expires_at" db:"expires_at"`
 	Status        string  `json:"status" db:"status"` // active, revoked, expired
+	CreatedBy     string  `json:"created_by" db:"created_by"`
 	Notes         string  `json:"notes" db:"notes"`
 	CreatedAt     string  `json:"created_at" db:"created_at"`
 	UpdatedAt     string  `json:"updated_at" db:"updated_at"`

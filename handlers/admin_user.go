@@ -13,15 +13,15 @@ import (
 
 // AdminCreateRequest 서브 관리자 생성 요청
 type AdminCreateRequest struct {
-	Username    string   `json:"username"`
-	Email       string   `json:"email"`
-	Password    string   `json:"password"`
-	Permissions []string `json:"permissions"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // AdminPermissionsUpdateRequest 관리자 권한 갱신 요청
 type AdminPermissionsUpdateRequest struct {
-	Permissions []string `json:"permissions"`
+	Permissions         []string                                        `json:"permissions"`
+	ResourcePermissions map[string]models.AdminResourcePermissionConfig `json:"resource_permissions"`
 }
 
 var emailRegex = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
@@ -55,6 +55,15 @@ func ListAdmins(w http.ResponseWriter, r *http.Request) {
 			}
 			a.Permissions = perms
 		}
+
+		resourcePerms, err := utils.GetAdminResourcePermissions(a.ID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load resource permissions", err))
+			return
+		}
+		a.ResourcePermissions = resourcePerms
+
 		// Password는 비워둠
 		list = append(list, a)
 	}
@@ -134,7 +143,7 @@ func CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := utils.SetAdminPermissions(id, req.Permissions); err != nil {
+	if err := utils.SetAdminPermissions(id, []string{}); err != nil {
 		switch err.(type) {
 		case *utils.InvalidPermissionError:
 			w.WriteHeader(http.StatusBadRequest)
@@ -154,6 +163,13 @@ func CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resourcePerms, err := utils.GetAdminResourcePermissions(id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load resource permissions", err))
+		return
+	}
+
 	logger.WithFields(map[string]interface{}{
 		"request_id": requestID,
 		"creator_id": creatorID,
@@ -165,11 +181,12 @@ func CreateAdmin(w http.ResponseWriter, r *http.Request) {
 
 	// 응답 (비밀번호는 제외)
 	created := models.Admin{
-		ID:          id,
-		Username:    req.Username,
-		Email:       req.Email,
-		Role:        role,
-		Permissions: perms,
+		ID:                  id,
+		Username:            req.Username,
+		Email:               req.Email,
+		Role:                role,
+		Permissions:         perms,
+		ResourcePermissions: resourcePerms,
 	}
 	json.NewEncoder(w).Encode(models.SuccessResponse("Admin created", created))
 }
@@ -227,6 +244,13 @@ func UpdateAdminPermissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resourcePerms, err := utils.SetAdminResourcePermissions(adminID, req.ResourcePermissions)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to assign resource permissions", err))
+		return
+	}
+
 	perms, err := utils.GetAdminPermissions(adminID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -243,7 +267,8 @@ func UpdateAdminPermissions(w http.ResponseWriter, r *http.Request) {
 	utils.LogAdminActivity(actorID, actorName, models.AdminActionUpdateAdminPerms, "Updated permissions for admin: "+username)
 
 	json.NewEncoder(w).Encode(models.SuccessResponse("Permissions updated", map[string]interface{}{
-		"permissions": perms,
+		"permissions":          perms,
+		"resource_permissions": resourcePerms,
 	}))
 }
 

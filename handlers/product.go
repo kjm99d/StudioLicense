@@ -33,15 +33,23 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	adminIDVal := r.Context().Value("admin_id")
+	creatorID, _ := adminIDVal.(string)
+	if strings.TrimSpace(creatorID) == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Missing creator context", nil))
+		return
+	}
+
 	id, _ := utils.GenerateID("prod")
 	now := time.Now().Format("2006-01-02 15:04:05")
 
 	// 버전은 사용하지 않으므로 빈 문자열로 저장
-	query := `INSERT INTO products (id, name, description, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO products (id, name, description, status, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`
 
 	_, err := database.DB.Exec(query, id, req.Name, req.Description,
-		models.ProductStatusActive, now, now)
+		models.ProductStatusActive, creatorID, now, now)
 
 	if err != nil {
 		logger.WithFields(map[string]interface{}{
@@ -69,6 +77,7 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 		Name:        req.Name,
 		Description: req.Description,
 		Status:      models.ProductStatusActive,
+		CreatedBy:   creatorID,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -103,12 +112,25 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 func GetProducts(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 
-	query := "SELECT id, name, description, status, created_at, updated_at FROM products WHERE 1=1"
-	var args []interface{}
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypeProducts)
+	if err != nil {
+		logger.Error("Failed to evaluate product permissions: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate product permissions", err))
+		return
+	}
+
+	query := "SELECT id, name, description, status, created_by, created_at, updated_at FROM products WHERE 1=1"
+	args := make([]interface{}, 0)
 
 	if status != "" {
 		query += " AND status = ?"
 		args = append(args, status)
+	}
+	if !isSuper {
+		filterSQL, filterArgs := utils.BuildResourceFilter(scope, "id", "created_by", adminID)
+		query += filterSQL
+		args = append(args, filterArgs...)
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -127,11 +149,15 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 	products := []models.Product{}
 	for rows.Next() {
 		var product models.Product
+		var createdBy sql.NullString
 		err := rows.Scan(&product.ID, &product.Name, &product.Description,
-			&product.Status, &product.CreatedAt, &product.UpdatedAt)
+			&product.Status, &createdBy, &product.CreatedAt, &product.UpdatedAt)
 		if err != nil {
 			logger.Warn("Failed to scan product: %v", err)
 			continue
+		}
+		if createdBy.Valid {
+			product.CreatedBy = createdBy.String
 		}
 		products = append(products, product)
 	}
@@ -160,11 +186,35 @@ func GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var product models.Product
-	query := "SELECT id, name, description, status, created_at, updated_at FROM products WHERE id = ?"
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypeProducts)
+	if err != nil {
+		logger.Error("Failed to evaluate product permissions: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate product permissions", err))
+		return
+	}
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeNone) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: product access denied", nil))
+		return
+	}
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeCustom) && !utils.CanAccessResource(scope, id, "", adminID) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: product access denied", nil))
+		return
+	}
 
-	err := database.DB.QueryRow(query, id).Scan(&product.ID, &product.Name,
-		&product.Description, &product.Status, &product.CreatedAt, &product.UpdatedAt)
+	var product models.Product
+	query := "SELECT id, name, description, status, created_by, created_at, updated_at FROM products WHERE id = ?"
+	args := []interface{}{id}
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeOwn) {
+		query += " AND created_by = ?"
+		args = append(args, adminID)
+	}
+
+	var createdBy sql.NullString
+	err = database.DB.QueryRow(query, args...).Scan(&product.ID, &product.Name,
+		&product.Description, &product.Status, &createdBy, &product.CreatedAt, &product.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
@@ -175,6 +225,16 @@ func GetProduct(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to retrieve product", err))
+		return
+	}
+
+	if createdBy.Valid {
+		product.CreatedBy = createdBy.String
+	}
+
+	if !isSuper && !utils.CanAccessResource(scope, product.ID, product.CreatedBy, adminID) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: product access denied", nil))
 		return
 	}
 

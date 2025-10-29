@@ -806,9 +806,8 @@
                     <input type="password" id="admin_password" name="password" minlength="8" required>
                 </div>
                 <div class="form-group">
-                    <label>기능 권한</label>
-                    <div id="create-admin-permissions" class="permission-grid"></div>
-                    <small class="permission-helper">필요한 기능 권한만 선택하세요.</small>
+                    <label>권한 안내</label>
+                    <p class="muted-text">계정은 권한 없이 생성됩니다. 생성 후 관리자 목록에서 기능 권한 및 리소스 권한을 수동으로 부여하세요.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn grey darken-1 modal-close">취소</button>
@@ -821,7 +820,7 @@
     <div id="manage-admin-permissions-modal" class="modal studio-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>관리자 기능 권한</h3>
+                <h3>관리자 권한 관리</h3>
                 <button class="modal-close" aria-label="닫기" title="닫기">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -831,8 +830,62 @@
             <form id="manage-admin-permissions-form">
                 <input type="hidden" id="manage-admin-id">
                 <div class="modal-body">
-                    <p class="permission-modal-intro"><strong id="manage-admin-name"></strong> 관리자에게 부여할 기능 권한을 선택하세요.</p>
-                    <div id="manage-admin-permissions" class="permission-grid"></div>
+                    <div id="function-permission-pane" class="permission-pane is-active">
+                        <p class="permission-modal-intro"><strong id="manage-admin-name"></strong> 관리자에게 부여할 기능 권한을 선택하세요.</p>
+                        <div id="manage-admin-permissions" class="permission-grid"></div>
+                    </div>
+
+                    <div id="resource-permission-pane" class="permission-pane" hidden>
+                        <div class="permission-modal-intro">
+                            기능 권한으로 허용된 범위 안에서 접근 가능한 라이선스·정책·제품을 선택하세요.
+                        </div>
+                        <div class="resource-permissions" data-role="resource-permissions">
+                            <div class="resource-permissions-intro">
+                                <h4>리소스 권한 설정</h4>
+                                <p>기능 권한에서 허용된 범위 안에서 접근 가능한 리소스를 선택하세요. 필요한 항목만 열어두면 관리가 더 안전해집니다.</p>
+                                <p class="resource-permissions-intro-note">먼저 왼쪽 목록에서 리소스 종류를 선택한 뒤 허용 모드와 세부 항목을 지정하세요.</p>
+                            </div>
+                            <div class="resource-permissions-body">
+                                <section class="resource-section">
+                                    <header class="resource-section-header">
+                                        <h5>리소스 종류</h5>
+                                        <p>관리할 리소스를 선택하면 아래 설정이 갱신됩니다.</p>
+                                    </header>
+                                    <div class="resource-type-choices" data-role="resource-type-tabs"></div>
+                                </section>
+                                <section class="resource-section">
+                                    <header class="resource-section-header">
+                                        <h5>허용 범위</h5>
+                                        <p>리소스 접근 범위를 모드로 선택하세요.</p>
+                                    </header>
+                                    <div class="resource-mode-list" data-role="resource-mode"></div>
+                                </section>
+                                <section class="resource-section">
+                                    <header class="resource-section-header">
+                                        <h5>세부 항목 선택</h5>
+                                        <p>선택한 항목만 모드에서 사용할 검색과 체크박스입니다.</p>
+                                    </header>
+                                    <div class="resource-tools">
+                                        <input type="search" class="resource-search-input" data-role="resource-search" placeholder="검색어를 입력하세요" />
+                                        <button type="button" class="btn-small grey lighten-2 resource-refresh-btn" data-role="resource-refresh">새로고침</button>
+                                    </div>
+                                    <div class="resource-helper-callout" data-role="resource-helper"></div>
+                                    <div class="resource-list-card">
+                                        <div class="resource-list" data-role="resource-list">
+                                            <div class="resource-empty">리소스 정보를 불러오는 중입니다...</div>
+                                        </div>
+                                    </div>
+                                </section>
+                                <section class="resource-section">
+                                    <header class="resource-section-header">
+                                        <h5>현재 설정 요약</h5>
+                                        <p>모든 리소스의 권한 상태를 한눈에 확인하세요.</p>
+                                    </header>
+                                    <div class="resource-summary" data-role="resource-summary"></div>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn grey darken-1 modal-close">취소</button>

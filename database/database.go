@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"studiolicense/logger"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -38,6 +39,10 @@ func Initialize(dsn string) error {
 	// 기본 관리자 계정 생성
 	if err := createDefaultAdmin(); err != nil {
 		return fmt.Errorf("failed to create default admin: %w", err)
+	}
+
+	if err := ensureResourceCreatorColumns(); err != nil {
+		return fmt.Errorf("failed to ensure resource creator columns: %w", err)
 	}
 
 	// 슈퍼 관리자 보장: 기존 DB에서 super_admin이 하나도 없으면 가장 오래된 관리자 1명을 승격
@@ -85,15 +90,40 @@ func createTables() error {
 			CONSTRAINT fk_admin_permissions_admin FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
+		// 관리자 리소스 권한 스코프 테이블
+		`CREATE TABLE IF NOT EXISTS admin_resource_scopes (
+			admin_id VARCHAR(50) NOT NULL,
+			resource_type VARCHAR(50) NOT NULL,
+			mode VARCHAR(20) NOT NULL DEFAULT 'all',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (admin_id, resource_type),
+			INDEX idx_admin_resource_scopes_admin (admin_id),
+			CONSTRAINT fk_admin_resource_scopes_admin FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
+		// 관리자 리소스 개별 선택 테이블
+		`CREATE TABLE IF NOT EXISTS admin_resource_selections (
+			admin_id VARCHAR(50) NOT NULL,
+			resource_type VARCHAR(50) NOT NULL,
+			resource_id VARCHAR(50) NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (admin_id, resource_type, resource_id),
+			INDEX idx_admin_resource_selections_admin (admin_id),
+			CONSTRAINT fk_admin_resource_selections_admin FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+
 		// 제품 테이블
 		`CREATE TABLE IF NOT EXISTS products (
 			id VARCHAR(50) PRIMARY KEY,
 			name VARCHAR(255) UNIQUE NOT NULL,
 			description TEXT,
 			status VARCHAR(50) NOT NULL DEFAULT 'active',
+			created_by VARCHAR(50),
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			INDEX idx_products_status (status)
+			INDEX idx_products_status (status),
+			INDEX idx_products_created_by (created_by)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 정책 테이블
@@ -101,8 +131,10 @@ func createTables() error {
 			id VARCHAR(50) PRIMARY KEY,
 			policy_name VARCHAR(255) UNIQUE NOT NULL,
 			policy_data LONGTEXT NOT NULL,
+			created_by VARCHAR(50),
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			INDEX idx_policies_created_by (created_by)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 라이선스 테이블
@@ -117,6 +149,7 @@ func createTables() error {
 			max_devices INT NOT NULL DEFAULT 1,
 			expires_at DATETIME NOT NULL,
 			status VARCHAR(50) NOT NULL DEFAULT 'active',
+			created_by VARCHAR(50),
 			notes TEXT,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -125,7 +158,8 @@ func createTables() error {
 			INDEX idx_licenses_key (license_key),
 			INDEX idx_licenses_product (product_id),
 			INDEX idx_licenses_status (status),
-			INDEX idx_licenses_expires (expires_at)
+			INDEX idx_licenses_expires (expires_at),
+			INDEX idx_licenses_created_by (created_by)
 		) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
 		// 디바이스 활성화 테이블
@@ -257,6 +291,36 @@ func ensureDeviceViewPermissionBackfill() error {
 		WHERE permission = 'devices.manage'
 	`)
 	return err
+}
+
+func ensureResourceCreatorColumns() error {
+	statements := []string{
+		`ALTER TABLE products ADD COLUMN created_by VARCHAR(50) NULL`,
+		`ALTER TABLE products ADD INDEX idx_products_created_by (created_by)`,
+		`ALTER TABLE policies ADD COLUMN created_by VARCHAR(50) NULL`,
+		`ALTER TABLE policies ADD INDEX idx_policies_created_by (created_by)`,
+		`ALTER TABLE licenses ADD COLUMN created_by VARCHAR(50) NULL`,
+		`ALTER TABLE licenses ADD INDEX idx_licenses_created_by (created_by)`,
+	}
+	for _, stmt := range statements {
+		if _, err := DB.Exec(stmt); err != nil {
+			if !isIgnorableSchemaError(err) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func isIgnorableSchemaError(err error) bool {
+	if err == nil {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate column") ||
+		strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "check that column/key exists")
 }
 
 // contains 문자열 포함 여부 확인

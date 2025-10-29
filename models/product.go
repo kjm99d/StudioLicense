@@ -6,6 +6,7 @@ type Product struct {
 	Name        string `json:"name" db:"name"`
 	Description string `json:"description" db:"description"`
 	Status      string `json:"status" db:"status"` // active, inactive
+	CreatedBy   string `json:"created_by" db:"created_by"`
 	CreatedAt   string `json:"created_at" db:"created_at"`
 	UpdatedAt   string `json:"updated_at" db:"updated_at"`
 }

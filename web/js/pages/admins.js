@@ -7,6 +7,34 @@ let permissionCatalog = [];
 let permissionCatalogLoaded = false;
 let permissionCatalogPromise = null;
 const adminsCache = new Map();
+const RESOURCE_TYPES = [
+  {
+    key: 'licenses',
+    label: '라이선스',
+    placeholder: '라이선스 키, 고객명 검색',
+    summaryLabel: '라이선스',
+  },
+  {
+    key: 'policies',
+    label: '정책',
+    placeholder: '정책명 검색',
+    summaryLabel: '정책',
+  },
+  {
+    key: 'products',
+    label: '제품',
+    placeholder: '제품명 검색',
+    summaryLabel: '제품',
+  },
+];
+const resourceTypeIndex = new Map(RESOURCE_TYPES.map((type) => [type.key, type]));
+const resourceCatalogCache = new Map(); // resourceType -> { items, loaded, loading, error }
+const resourcePermissionCache = new Map(); // adminId -> { resourceType: { mode, selected: Set, search: '' }, __loaded: boolean }
+const RESOURCE_MODES = new Set(['all', 'none', 'own', 'custom']);
+const resourceUIState = {
+  activeType: RESOURCE_TYPES[0]?.key || null,
+  activeAdminId: null,
+};
 
 async function ensurePermissionCatalog() {
   if (permissionCatalogLoaded) {
@@ -138,6 +166,616 @@ function renderPermissionChecklist(container, selectedKeys = []) {
   });
 }
 
+function ensureAdminResourceState(adminId) {
+  if (!resourcePermissionCache.has(adminId)) {
+    const defaults = {};
+    RESOURCE_TYPES.forEach(({ key }) => {
+      defaults[key] = {
+        mode: 'all',
+        selected: new Set(),
+        search: '',
+      };
+    });
+    defaults.__loaded = false;
+    resourcePermissionCache.set(adminId, defaults);
+  }
+  return resourcePermissionCache.get(adminId);
+}
+
+function normalizeResourceMode(mode) {
+  const normalized = String(mode || '').trim().toLowerCase();
+  return RESOURCE_MODES.has(normalized) ? normalized : 'all';
+}
+
+function applyResourcePermissionsToState(adminId, resourcePermissions) {
+  const state = ensureAdminResourceState(adminId);
+  RESOURCE_TYPES.forEach(({ key }) => {
+    const entry = state[key];
+    const incoming = resourcePermissions?.[key];
+    entry.mode = normalizeResourceMode(incoming?.mode);
+    const selectedIds = Array.isArray(incoming?.selected_ids) ? incoming.selected_ids : [];
+    entry.selected = new Set(selectedIds);
+  });
+  state.__loaded = true;
+  return state;
+}
+
+function serializeResourcePermissions(adminId) {
+  const state = ensureAdminResourceState(adminId);
+  const payload = {};
+  RESOURCE_TYPES.forEach(({ key }) => {
+    const entry = state[key];
+    payload[key] = {
+      mode: normalizeResourceMode(entry.mode),
+      selected_ids: Array.from(entry.selected || []),
+    };
+  });
+  return payload;
+}
+
+function getAdminResourceModeLabel(mode) {
+  switch (mode) {
+    case 'all':
+      return '모두 허용';
+    case 'none':
+      return '모두 차단';
+    case 'own':
+      return '내가 생성한 항목';
+    case 'custom':
+      return '선택한 항목만';
+    default:
+      return mode;
+  }
+}
+
+function getResourceModeChipClass(mode) {
+  switch (normalizeResourceMode(mode)) {
+    case 'none':
+      return 'resource-mode-chip resource-mode-chip--none';
+    case 'own':
+      return 'resource-mode-chip resource-mode-chip--own';
+    case 'custom':
+      return 'resource-mode-chip resource-mode-chip--custom';
+    case 'all':
+    default:
+      return 'resource-mode-chip resource-mode-chip--all';
+  }
+}
+
+function getResourceUIElements() {
+  const modal = document.getElementById('manage-admin-permissions-modal');
+  if (!modal) return null;
+  return {
+    pane: modal.querySelector('#resource-permission-pane'),
+    typeTabs: modal.querySelector('[data-role="resource-type-tabs"]'),
+    modeContainer: modal.querySelector('[data-role="resource-mode"]'),
+    helper: modal.querySelector('[data-role="resource-helper"]'),
+    searchInput: modal.querySelector('[data-role="resource-search"]'),
+    refreshButton: modal.querySelector('[data-role="resource-refresh"]'),
+    list: modal.querySelector('[data-role="resource-list"]'),
+    summary: modal.querySelector('[data-role="resource-summary"]'),
+  };
+}
+
+function getResourceCatalog(type) {
+  if (!resourceCatalogCache.has(type)) {
+    resourceCatalogCache.set(type, {
+      items: [],
+      loaded: false,
+      loading: false,
+      error: null,
+      lastFetched: 0,
+      loadingPromise: null,
+    });
+  }
+  return resourceCatalogCache.get(type);
+}
+
+async function loadResourceCatalog(type, forceReload = false) {
+  const catalog = getResourceCatalog(type);
+  if (catalog.loaded && !forceReload) {
+    return catalog;
+  }
+  if (catalog.loading && catalog.loadingPromise) {
+    await catalog.loadingPromise;
+    return resourceCatalogCache.get(type);
+  }
+
+  const loader = async () => {
+    try {
+      const items = await fetchResourceItems(type);
+      catalog.items = items;
+      catalog.loaded = true;
+      catalog.error = null;
+      catalog.lastFetched = Date.now();
+    } catch (err) {
+      console.error(`Failed to load ${type} resources:`, err);
+      catalog.error = err?.message || '리소스를 불러오지 못했습니다.';
+    } finally {
+      catalog.loading = false;
+      catalog.loadingPromise = null;
+    }
+    return catalog;
+  };
+
+  catalog.loading = true;
+  catalog.loadingPromise = loader();
+  await catalog.loadingPromise;
+  return resourceCatalogCache.get(type);
+}
+
+async function fetchResourceItems(type) {
+  const config = resourceTypeIndex.get(type);
+  if (!config) return [];
+
+  switch (type) {
+    case 'licenses': {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/licenses?page=1&page_size=100`, {
+        headers: { Authorization: `Bearer ${state.token}` },
+        _noGlobalLoading: true,
+      });
+      const body = await res.json();
+      if (res.status === 403) {
+        throw new Error(`${config?.label || type} 목록에 접근할 권한이 없습니다. 기능 권한에서 조회 권한을 먼저 부여하세요.`);
+      }
+      if (res.ok && body.status === 'success') {
+        const items = Array.isArray(body.data) ? body.data : [];
+        return items.map((license) => ({
+          id: license.id,
+          name: license.license_key,
+          description: `${license.customer_name || '-'} · ${license.product_name || '-'}`,
+        }));
+      }
+      throw new Error(body?.message || '라이선스를 불러오지 못했습니다.');
+    }
+    case 'policies': {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/policies`, {
+        headers: { Authorization: `Bearer ${state.token}` },
+        _noGlobalLoading: true,
+      });
+      const body = await res.json();
+      if (res.status === 403) {
+        throw new Error(`${config?.label || type} 목록에 접근할 권한이 없습니다. 정책 조회 기능 권한을 부여하세요.`);
+      }
+      if (res.ok && body.status === 'success') {
+        const items = Array.isArray(body.data) ? body.data : [];
+        return items.map((policy) => ({
+          id: policy.id,
+          name: policy.policy_name,
+          description: `업데이트: ${formatDateTime(policy.updated_at)}`,
+        }));
+      }
+      throw new Error(body?.message || '정책을 불러오지 못했습니다.');
+    }
+    case 'products': {
+      const res = await apiFetch(`${API_BASE_URL}/api/admin/products`, {
+        headers: { Authorization: `Bearer ${state.token}` },
+        _noGlobalLoading: true,
+      });
+      const body = await res.json();
+      if (res.status === 403) {
+        throw new Error(`${config?.label || type} 목록에 접근할 권한이 없습니다. 제품 조회 기능 권한을 부여하세요.`);
+      }
+      if (res.ok && body.status === 'success') {
+        const items = Array.isArray(body.data) ? body.data : [];
+        return items.map((product) => ({
+          id: product.id,
+          name: product.name,
+          description: product.description || '-',
+        }));
+      }
+      throw new Error(body?.message || '제품을 불러오지 못했습니다.');
+    }
+    default:
+      return [];
+  }
+}
+
+function renderResourceTypeTabs(adminId) {
+  const ui = getResourceUIElements();
+  if (!ui?.typeTabs) return;
+  const state = ensureAdminResourceState(adminId);
+  const activeType = resourceUIState.activeType || RESOURCE_TYPES[0]?.key;
+  ui.typeTabs.innerHTML = RESOURCE_TYPES.map((type) => {
+    const entry = state[type.key] || { mode: 'all', selected: new Set() };
+    const config = resourceTypeIndex.get(type.key);
+    const chipClass = getResourceModeChipClass(entry.mode);
+    const modeLabel = getAdminResourceModeLabel(entry.mode);
+    const customDetail =
+      entry.mode === 'custom'
+        ? entry.selected.size > 0
+          ? `선택 ${entry.selected.size}개`
+          : '선택된 항목 없음'
+        : '';
+    return `
+      <button type="button" class="resource-type-tab ${activeType === type.key ? 'is-active' : ''}" data-resource-type="${type.key}">
+        <span class="resource-type-label">${escapeHtml(config?.label || type.label || type.key)}</span>
+        <div class="resource-type-meta">
+          <span class="${chipClass}">${escapeHtml(modeLabel)}</span>
+          ${customDetail ? `<span class="resource-type-detail">${escapeHtml(customDetail)}</span>` : ''}
+        </div>
+      </button>
+    `;
+  }).join('');
+}
+
+function updateResourceToolsState(adminId, type) {
+  const ui = getResourceUIElements();
+  if (!ui) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  if (!state) return;
+  const config = resourceTypeIndex.get(type);
+  const isCustom = state.mode === 'custom';
+  if (ui.searchInput) {
+    const placeholder = config?.placeholder || '검색어를 입력하세요';
+    ui.searchInput.placeholder = isCustom ? placeholder : '선택한 항목만 모드에서 사용할 수 있습니다';
+    const currentValue = state.search || '';
+    if (ui.searchInput.value !== currentValue) {
+      ui.searchInput.value = currentValue;
+    }
+    ui.searchInput.disabled = !isCustom;
+    if (isCustom) {
+      ui.searchInput.removeAttribute('title');
+    } else {
+      ui.searchInput.title = '선택한 항목만 모드에서 사용할 수 있습니다';
+    }
+  }
+  if (ui.refreshButton) {
+    ui.refreshButton.disabled = !isCustom;
+    if (isCustom) {
+      ui.refreshButton.removeAttribute('title');
+    } else {
+      ui.refreshButton.title = '선택한 항목만 모드에서만 새로고침할 수 있습니다';
+    }
+  }
+}
+
+function renderResourceModeControls(adminId, type) {
+  const ui = getResourceUIElements();
+  if (!ui?.modeContainer) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  const modes = [
+    {
+      value: 'all',
+      label: '모두 허용',
+      description: '기능 권한이 허용한 범위 내에서 모든 항목을 열람·관리할 수 있습니다.',
+    },
+    {
+      value: 'none',
+      label: '모두 차단',
+      description: '이 리소스는 관리자에게 표시되지 않습니다.',
+    },
+    {
+      value: 'own',
+      label: '내가 생성한 항목',
+      description: '이 관리자가 직접 생성한 항목만 열람·관리할 수 있습니다.',
+    },
+    {
+      value: 'custom',
+      label: '선택한 항목만',
+      description: '검색과 체크박스를 사용해 허용할 항목을 지정하세요.',
+    },
+  ];
+  ui.modeContainer.innerHTML = modes
+    .map(
+      (mode) => `
+    <label class="resource-mode-card ${state.mode === mode.value ? 'is-active' : ''}">
+      <input type="radio" name="resource-mode-${type}" value="${mode.value}" ${state.mode === mode.value ? 'checked' : ''}>
+      <span class="resource-mode-title">${mode.label}</span>
+      <span class="resource-mode-description">${mode.description}</span>
+    </label>
+  `,
+    )
+    .join('');
+}
+
+function getFilteredResourceItems(items, searchTerm) {
+  if (!searchTerm) return items;
+  const lc = searchTerm.toLowerCase();
+  return items.filter((item) => {
+    return (
+      (item.name && item.name.toLowerCase().includes(lc)) ||
+      (item.description && item.description.toLowerCase().includes(lc))
+    );
+  });
+}
+
+async function renderResourceList(adminId, type) {
+  const ui = getResourceUIElements();
+  if (!ui?.list) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  ui.list.innerHTML = '';
+
+  if (state.mode !== 'custom') {
+    ui.list.innerHTML =
+      '<div class="resource-empty">"선택한 항목만" 모드에서 허용할 항목을 선택할 수 있습니다.</div>';
+    return;
+  }
+
+  const catalog = await loadResourceCatalog(type);
+  if (catalog.error) {
+    ui.list.innerHTML = `<div class="resource-empty">${escapeHtml(catalog.error)}</div>`;
+    return;
+  }
+
+  const items = getFilteredResourceItems(catalog.items || [], state.search);
+  if (!items.length) {
+    ui.list.innerHTML = '<div class="resource-empty">조건에 맞는 항목이 없습니다.</div>';
+    return;
+  }
+
+  const rows = items
+    .map((item) => {
+      const checkboxId = `resource-${type}-${item.id}`;
+      const isSelected = state.selected.has(item.id);
+      return `
+        <tr class="resource-table-row ${isSelected ? 'is-selected' : ''}" data-resource-id="${item.id}">
+          <td class="resource-table-check">
+            <input type="checkbox" class="resource-item-checkbox" id="${checkboxId}" ${isSelected ? 'checked' : ''} />
+          </td>
+          <td class="resource-table-info">
+            <label for="${checkboxId}">
+              <div class="resource-item-title">${escapeHtml(item.name || '-')}</div>
+              <div class="resource-item-meta">${escapeHtml(item.description || '')}</div>
+            </label>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  ui.list.innerHTML = `
+    <table class="resource-table">
+      <colgroup>
+        <col class="resource-table-col-check" />
+        <col />
+      </colgroup>
+      <thead>
+        <tr>
+          <th scope="col" class="resource-table-header-check">선택</th>
+          <th scope="col">항목</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderResourceHelper(adminId, type) {
+  const ui = getResourceUIElements();
+  if (!ui?.helper) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  const config = resourceTypeIndex.get(type);
+  let message = '';
+  let variant = 'info';
+
+  switch (state.mode) {
+    case 'none':
+      message = `${config?.label || type} 리소스가 관리자에게 표시되지 않습니다.`;
+      variant = 'warn';
+      break;
+    case 'own':
+      message = '이 관리자가 직접 생성한 항목만 열람·관리할 수 있습니다.';
+      variant = 'success';
+      break;
+    case 'custom':
+      message = '허용할 항목을 체크박스로 선택하세요. 선택하지 않으면 접근이 제한됩니다.';
+      variant = 'info';
+      break;
+    case 'all':
+    default:
+      message = `${config?.label || type}의 모든 항목에 접근할 수 있습니다.`;
+      variant = 'info';
+      break;
+  }
+
+  ui.helper.textContent = message;
+  ui.helper.dataset.variant = variant;
+}
+
+function renderResourceSummary(adminId) {
+  const ui = getResourceUIElements();
+  if (!ui?.summary) return;
+  const state = ensureAdminResourceState(adminId);
+
+  const items = RESOURCE_TYPES.map((type) => {
+    const entry = state[type.key] || { mode: 'all', selected: new Set() };
+    const config = resourceTypeIndex.get(type.key);
+    const chipClass = getResourceModeChipClass(entry.mode);
+    const modeLabel = getAdminResourceModeLabel(entry.mode);
+    const selectionCount = entry.selected instanceof Set ? entry.selected.size : 0;
+    let detail = '';
+    switch (entry.mode) {
+      case 'custom':
+        detail = selectionCount > 0 ? `선택 ${selectionCount}개` : '선택된 항목 없음';
+        break;
+      case 'own':
+        detail = '현재 관리자 생성분';
+        break;
+      case 'none':
+        detail = '접근 차단';
+        break;
+      default:
+        detail = '';
+    }
+
+    return `
+      <div class="resource-summary-item">
+        <span class="resource-summary-item-label">${escapeHtml(config?.summaryLabel || config?.label || type.label || type.key)}</span>
+        <div class="resource-summary-item-detail">
+          <span class="${chipClass}">${escapeHtml(modeLabel)}</span>
+          ${detail ? `<span class="resource-summary-note">${escapeHtml(detail)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  ui.summary.innerHTML = `
+    <div>
+      <h4 class="resource-summary-title">현재 설정</h4>
+      <p class="resource-summary-note">리소스 권한은 기능 권한 범위 안에서만 적용됩니다.</p>
+    </div>
+    <div class="resource-summary-list">
+      ${items}
+    </div>
+  `;
+}
+
+async function renderResourcePermissionsPane(adminId) {
+  const ui = getResourceUIElements();
+  if (!ui) return;
+  resourceUIState.activeAdminId = adminId;
+  if (!resourceUIState.activeType) {
+    resourceUIState.activeType = RESOURCE_TYPES[0]?.key || null;
+  }
+
+  renderResourceTypeTabs(adminId);
+  const activeType = resourceUIState.activeType;
+  updateResourceToolsState(adminId, activeType);
+  renderResourceModeControls(adminId, activeType);
+  renderResourceHelper(adminId, activeType);
+  await renderResourceList(adminId, activeType);
+  renderResourceSummary(adminId);
+}
+
+function handleResourceTypeTabClick(event) {
+  const button = event.target.closest('button[data-resource-type]');
+  if (!button) return;
+  const { resourceType } = button.dataset;
+  if (!resourceTypeIndex.has(resourceType)) return;
+  resourceUIState.activeType = resourceType;
+  const adminId = resourceUIState.activeAdminId;
+  if (!adminId) return;
+  renderResourcePermissionsPane(adminId);
+}
+
+function handleResourceModeChange(event) {
+  if (event.target.tagName !== 'INPUT') return;
+  const { value } = event.target;
+  const type = resourceUIState.activeType;
+  const adminId = resourceUIState.activeAdminId;
+  if (!type || !adminId) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  state.mode = value;
+  if (value !== 'custom') {
+    state.selected.clear();
+  }
+  renderResourceModeControls(adminId, type);
+  updateResourceToolsState(adminId, type);
+  renderResourceHelper(adminId, type);
+  renderResourceSummary(adminId);
+  renderResourceList(adminId, type);
+  renderResourceTypeTabs(adminId);
+}
+
+function handleResourceItemToggle(event) {
+  const row = event.target.closest('.resource-table-row');
+  if (!row) return;
+  const checkbox = row.querySelector('.resource-item-checkbox');
+  if (!checkbox) return;
+  if (event.target === checkbox || event.target.tagName === 'LABEL') {
+    return;
+  }
+  checkbox.click();
+}
+
+function handleResourceItemCheckboxChange(event) {
+  const checkbox = event.target.closest('.resource-item-checkbox');
+  if (!checkbox) return;
+  const row = checkbox.closest('.resource-table-row');
+  if (!row) return;
+  const type = resourceUIState.activeType;
+  const adminId = resourceUIState.activeAdminId;
+  if (!type || !adminId) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  if (state.mode !== 'custom') {
+    checkbox.checked = false;
+    return;
+  }
+  const resourceId = row.dataset.resourceId;
+  if (!resourceId) return;
+  if (checkbox.checked) {
+    state.selected.add(resourceId);
+  } else {
+    state.selected.delete(resourceId);
+  }
+  row.classList.toggle('is-selected', checkbox.checked);
+  renderResourceSummary(adminId);
+  renderResourceTypeTabs(adminId);
+}
+
+function handleResourceSearchInput(event) {
+  const type = resourceUIState.activeType;
+  const adminId = resourceUIState.activeAdminId;
+  if (!type || !adminId) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  if (state.mode !== 'custom') return;
+  state.search = event.target.value.trim();
+  renderResourceList(adminId, type);
+}
+
+function handleResourceRefresh() {
+  const type = resourceUIState.activeType;
+  const adminId = resourceUIState.activeAdminId;
+  if (!type || !adminId) return;
+  const state = ensureAdminResourceState(adminId)[type];
+  if (state.mode !== 'custom') return;
+  resourceCatalogCache.delete(type);
+  renderResourceList(adminId, type);
+}
+
+function initializeResourcePermissionEvents() {
+  const ui = getResourceUIElements();
+  if (!ui) return;
+  if (ui.typeTabs && !ui.typeTabs.dataset.bound) {
+    ui.typeTabs.addEventListener('click', handleResourceTypeTabClick);
+    ui.typeTabs.dataset.bound = 'true';
+  }
+  if (ui.modeContainer && !ui.modeContainer.dataset.bound) {
+    ui.modeContainer.addEventListener('change', handleResourceModeChange);
+    ui.modeContainer.dataset.bound = 'true';
+  }
+  if (ui.list && !ui.list.dataset.bound) {
+    ui.list.addEventListener('click', handleResourceItemToggle);
+    ui.list.addEventListener('change', handleResourceItemCheckboxChange);
+    ui.list.dataset.bound = 'true';
+  }
+  if (ui.searchInput && !ui.searchInput.dataset.bound) {
+    ui.searchInput.addEventListener('input', handleResourceSearchInput);
+    ui.searchInput.dataset.bound = 'true';
+  }
+  if (ui.refreshButton && !ui.refreshButton.dataset.bound) {
+    ui.refreshButton.addEventListener('click', handleResourceRefresh);
+    ui.refreshButton.dataset.bound = 'true';
+  }
+}
+
+function switchPermissionPane(target) {
+  const modal = document.getElementById('manage-admin-permissions-modal');
+  if (!modal) return;
+  const functionPane = modal.querySelector('#function-permission-pane');
+  const resourcePane = modal.querySelector('#resource-permission-pane');
+  const showResource = target === 'resource';
+
+  if (functionPane) {
+    const isActive = !showResource;
+    functionPane.classList.toggle('is-active', isActive);
+    functionPane.hidden = !isActive;
+  }
+  if (resourcePane) {
+    resourcePane.classList.toggle('is-active', showResource);
+    resourcePane.hidden = !showResource;
+  }
+
+  modal.setAttribute('data-active-permission-pane', showResource ? 'resource' : 'function');
+
+  if (showResource && resourceUIState.activeAdminId) {
+    renderResourcePermissionsPane(resourceUIState.activeAdminId);
+  }
+}
+
 function updatePermissionGroupSummary(group) {
   const summaryEl = group.querySelector('.permission-group-summary');
   if (!summaryEl) return;
@@ -225,8 +863,13 @@ export async function loadAdmins() {
       } else {
         // DOM API로 안전하게 렌더링하여 셀 누락 문제를 방지
         tbody.innerHTML = '';
-        admins.forEach(a => {
-          adminsCache.set(String(a.id), a);
+        admins.forEach((a) => {
+          applyResourcePermissionsToState(a.id, a.resource_permissions);
+          const cachedAdmin = {
+            ...a,
+            resource_permissions: serializeResourcePermissions(a.id),
+          };
+          adminsCache.set(String(a.id), cachedAdmin);
           const tr = document.createElement('tr');
 
           // 아이디/유저명
@@ -251,7 +894,7 @@ export async function loadAdmins() {
           tdRole.appendChild(roleSpan);
           tr.appendChild(tdRole);
 
-          const permissionKeys = Array.isArray(a.permissions) ? a.permissions : [];
+          const permissionKeys = Array.isArray(cachedAdmin.permissions) ? cachedAdmin.permissions : [];
           const tdPermissions = document.createElement('td');
           tdPermissions.className = 'admin-permissions-cell';
           tdPermissions.innerHTML = buildPermissionSummary(permissionKeys, isSuper(a.role));
@@ -284,6 +927,16 @@ export async function loadAdmins() {
             manageBtn.dataset.permissions = permissionKeys.join(',');
             manageBtn.textContent = '⚙️ 기능 권한';
             actionsDiv.appendChild(manageBtn);
+
+            const resourceBtn = document.createElement('a');
+            resourceBtn.href = '#';
+            resourceBtn.className = 'btn btn-sm indigo lighten-1';
+            resourceBtn.dataset.action = 'resource-permissions';
+            resourceBtn.dataset.adminId = String(a.id);
+            resourceBtn.dataset.adminName = String(a.username);
+            resourceBtn.dataset.permissions = permissionKeys.join(',');
+            resourceBtn.textContent = '🗂️ 리소스 권한';
+            actionsDiv.appendChild(resourceBtn);
 
             const resetA = document.createElement('a');
             resetA.href = '#';
@@ -329,60 +982,54 @@ export async function handleCreateAdmin(e) {
   const password = document.getElementById('admin_password').value;
   if (!username || !email || !password) return;
 
-  const createPermissionsContainer = document.getElementById('create-admin-permissions');
-  const selectedPermissions = getSelectedPermissions(createPermissionsContainer);
-
   const submitBtn = e.target.querySelector('button[type="submit"]');
   const originalBtnText = submitBtn ? submitBtn.textContent : '';
   const originalBtnDisabled = submitBtn ? submitBtn.disabled : false;
-  
-  if (submitBtn) { 
-    submitBtn.disabled = true; 
-    submitBtn.textContent = '생성 중...'; 
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '생성 중...';
   }
 
   try {
     const res = await apiFetch(`${API_BASE_URL}/api/admin/admins/create`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${state.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, permissions: selectedPermissions }),
+      body: JSON.stringify({ username, email, password }),
       _noGlobalLoading: true
     });
     const body = await res.json();
-    
+
     if (res.ok && body.status === 'success') {
-      // 순서 중요: 먼저 데이터 로드, 그 다음 UI 업데이트
       await loadAdmins();
       if (window.loadRecentActivities) await window.loadRecentActivities();
-      
-      // 모달 닫기 및 폼 초기화 (alert 전에)
+
       const createAdminModal = document.getElementById('create-admin-modal');
       if (createAdminModal) {
         closeModal(createAdminModal);
       }
       e.target.reset();
-      renderPermissionChecklist(createPermissionsContainer, []);
-      
-      // 모달 닫은 후 alert 보이기
+
+      if (submitBtn) {
+        submitBtn.disabled = originalBtnDisabled;
+        submitBtn.textContent = originalBtnText;
+      }
+
       setTimeout(() => {
-        showAlert('서브 관리자가 생성되었습니다.', '관리자 생성');
+        showAlert('서브 관리자가 생성되었습니다.\n\n생성된 계정은 권한이 없습니다. 관리자 목록에서 기능 권한과 리소스 권한을 수동으로 부여하세요.', '관리자 생성');
       }, 300);
     } else {
-      // 실패 시: 먼저 모달 닫기, 그 다음 alert 표시
       const createAdminModal = document.getElementById('create-admin-modal');
       if (createAdminModal) {
         closeModal(createAdminModal);
       }
       e.target.reset();
-      renderPermissionChecklist(createPermissionsContainer, selectedPermissions);
-      
-      // 버튼 상태 복구
-      if (submitBtn) { 
-        submitBtn.disabled = originalBtnDisabled; 
-        submitBtn.textContent = originalBtnText; 
+
+      if (submitBtn) {
+        submitBtn.disabled = originalBtnDisabled;
+        submitBtn.textContent = originalBtnText;
       }
-      
-      // 모달 닫은 후 alert 보이기
+
       setTimeout(() => {
         showAlert(body.message || '생성에 실패했습니다.', '관리자 생성 실패');
       }, 300);
@@ -390,22 +1037,18 @@ export async function handleCreateAdmin(e) {
     }
   } catch (err) {
     console.error('Failed to create admin:', err);
-    
-    // 에러 시: 먼저 모달 닫기, 그 다음 alert 표시
+
     const createAdminModal = document.getElementById('create-admin-modal');
     if (createAdminModal) {
       closeModal(createAdminModal);
     }
     e.target.reset();
-    renderPermissionChecklist(createPermissionsContainer, selectedPermissions);
-    
-    // 버튼 상태 복구
-    if (submitBtn) { 
-      submitBtn.disabled = originalBtnDisabled; 
-      submitBtn.textContent = originalBtnText; 
+
+    if (submitBtn) {
+      submitBtn.disabled = originalBtnDisabled;
+      submitBtn.textContent = originalBtnText;
     }
-    
-    // 모달 닫은 후 alert 보이기
+
     setTimeout(() => {
       showAlert('서버 오류가 발생했습니다.', '관리자 생성 실패');
     }, 300);
@@ -414,16 +1057,18 @@ export async function handleCreateAdmin(e) {
 }
 
 export async function prepareCreateAdminModal() {
-  try {
-    await ensurePermissionCatalog();
-  } catch (err) {
-    console.warn('Permission catalog unavailable for create modal:', err);
+  const form = document.getElementById('create-admin-form');
+  if (form) {
+    form.reset();
   }
-  const container = document.getElementById('create-admin-permissions');
-  renderPermissionChecklist(container, []);
+  const usernameInput = document.getElementById('admin_username');
+  if (usernameInput) {
+    usernameInput.focus();
+  }
 }
 
-async function openManagePermissionsModal(adminId, adminName, permissions = []) {
+async function openManagePermissionsModal(adminId, adminName, permissions = [], options = {}) {
+  const initialTab = options?.initialTab === 'resource' ? 'resource' : 'function';
   try {
     await ensurePermissionCatalog();
   } catch (err) {
@@ -445,8 +1090,19 @@ async function openManagePermissionsModal(adminId, adminName, permissions = []) 
   } else if (Array.isArray(permissions) && permissions.length > 0) {
     effectivePermissions = [...permissions];
   }
+  applyResourcePermissionsToState(adminId, cached?.resource_permissions);
 
   renderPermissionChecklist(container, effectivePermissions);
+
+  ensureAdminResourceState(adminId);
+  const previousAdmin = resourceUIState.activeAdminId;
+  resourceUIState.activeAdminId = adminId;
+  if (previousAdmin !== adminId && RESOURCE_TYPES.length) {
+    resourceUIState.activeType = RESOURCE_TYPES[0].key;
+  }
+  initializeResourcePermissionEvents();
+  switchPermissionPane(initialTab);
+  renderResourceSummary(adminId);
 
   if (modal) {
     openModal(modal);
@@ -470,10 +1126,14 @@ async function handleUpdateAdminPermissions(e) {
   }
 
   try {
+    const resourcePayload = serializeResourcePermissions(adminId);
     const res = await apiFetch(`${API_BASE_URL}/api/admin/admins/${adminId}/permissions`, {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${state.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ permissions: selectedPermissions }),
+      body: JSON.stringify({
+        permissions: selectedPermissions,
+        resource_permissions: resourcePayload,
+      }),
       _noGlobalLoading: true
     });
     const body = await res.json();
@@ -483,9 +1143,12 @@ async function handleUpdateAdminPermissions(e) {
       if (modal) closeModal(modal);
 
       const cached = adminsCache.get(String(adminId)) || {};
+      const responseResource = body.data?.resource_permissions || resourcePayload;
+      applyResourcePermissionsToState(adminId, responseResource);
       adminsCache.set(String(adminId), {
         ...cached,
         permissions: [...selectedPermissions],
+        resource_permissions: serializeResourcePermissions(adminId),
       });
 
       await loadAdmins();

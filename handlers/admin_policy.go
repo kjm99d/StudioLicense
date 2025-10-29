@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"studiolicense/database"
 	"studiolicense/logger"
 	"studiolicense/models"
@@ -27,7 +28,13 @@ import (
 // @Router /api/admin/policies [post]
 func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 	requestID := r.Context().Value("request_id")
-	adminID := r.Context().Value("admin_id")
+	adminIDVal := r.Context().Value("admin_id")
+	creatorID, _ := adminIDVal.(string)
+	if strings.TrimSpace(creatorID) == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Missing creator context", nil))
+		return
+	}
 
 	var req models.CreatePolicyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,10 +68,10 @@ func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 
-	query := `INSERT INTO policies (id, policy_name, policy_data, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)`
+	query := `INSERT INTO policies (id, policy_name, policy_data, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)`
 
-	_, err = database.DB.Exec(query, policyID, req.PolicyName, req.PolicyData, now, now)
+	_, err = database.DB.Exec(query, policyID, req.PolicyName, req.PolicyData, creatorID, now, now)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to create policy", err))
@@ -76,16 +83,17 @@ func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 		ID:         policyID,
 		PolicyName: req.PolicyName,
 		PolicyData: req.PolicyData,
+		CreatedBy:  creatorID,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
 
 	// 활동 로그 기록
-	utils.LogAdminActivity(adminID.(string), "admin", models.AdminActionCreatePolicy, "Policy created: "+policyID)
+	utils.LogAdminActivity(creatorID, "admin", models.AdminActionCreatePolicy, "Policy created: "+policyID)
 
 	logger.WithFields(map[string]interface{}{
 		"request_id": requestID,
-		"admin_id":   adminID,
+		"admin_id":   creatorID,
 		"policy_id":  policyID,
 	}).Info("Policy created")
 
@@ -105,10 +113,24 @@ func CreatePolicy(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} models.APIResponse "서버 에러"
 // @Router /api/admin/policies [get]
 func GetAllPolicies(w http.ResponseWriter, r *http.Request) {
-	query := `SELECT id, policy_name, policy_data, created_at, updated_at
-		FROM policies ORDER BY created_at DESC`
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypePolicies)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate policy permissions", err))
+		return
+	}
 
-	rows, err := database.DB.Query(query)
+	query := `SELECT id, policy_name, policy_data, created_by, created_at, updated_at
+		FROM policies WHERE 1=1`
+	args := make([]interface{}, 0)
+	if !isSuper {
+		filterSQL, filterArgs := utils.BuildResourceFilter(scope, "id", "created_by", adminID)
+		query += filterSQL
+		args = append(args, filterArgs...)
+	}
+	query += " ORDER BY created_at DESC"
+
+	rows, err := database.DB.Query(query, args...)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query policies", err))
@@ -120,7 +142,7 @@ func GetAllPolicies(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var policy models.Policy
 		err := rows.Scan(
-			&policy.ID, &policy.PolicyName, &policy.PolicyData,
+			&policy.ID, &policy.PolicyName, &policy.PolicyData, &policy.CreatedBy,
 			&policy.CreatedAt, &policy.UpdatedAt,
 		)
 		if err != nil {
@@ -152,12 +174,24 @@ func GetPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var policy models.Policy
-	query := `SELECT id, policy_name, policy_data, created_at, updated_at
-		FROM policies WHERE id = ?`
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypePolicies)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate policy permissions", err))
+		return
+	}
 
-	err := database.DB.QueryRow(query, policyID).Scan(
-		&policy.ID, &policy.PolicyName, &policy.PolicyData,
+	var policy models.Policy
+	query := `SELECT id, policy_name, policy_data, created_by, created_at, updated_at
+		FROM policies WHERE id = ?`
+	args := []interface{}{policyID}
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeOwn) {
+		query += " AND created_by = ?"
+		args = append(args, adminID)
+	}
+
+	err = database.DB.QueryRow(query, args...).Scan(
+		&policy.ID, &policy.PolicyName, &policy.PolicyData, &policy.CreatedBy,
 		&policy.CreatedAt, &policy.UpdatedAt,
 	)
 
@@ -170,6 +204,12 @@ func GetPolicy(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query policy", err))
+		return
+	}
+
+	if !isSuper && !utils.CanAccessResource(scope, policy.ID, policy.CreatedBy, adminID) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: policy access denied", nil))
 		return
 	}
 

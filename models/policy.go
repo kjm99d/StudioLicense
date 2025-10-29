@@ -5,6 +5,7 @@ type Policy struct {
 	ID         string `json:"id" db:"id"`
 	PolicyName string `json:"policy_name" db:"policy_name"`
 	PolicyData string `json:"policy_data" db:"policy_data"` // JSON 형식의 정책 데이터
+	CreatedBy  string `json:"created_by" db:"created_by"`
 	CreatedAt  string `json:"created_at" db:"created_at"`
 	UpdatedAt  string `json:"updated_at" db:"updated_at"`
 }

@@ -35,6 +35,14 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	adminIDVal := r.Context().Value("admin_id")
+	creatorID, _ := adminIDVal.(string)
+	if strings.TrimSpace(creatorID) == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Missing creator context", nil))
+		return
+	}
+
 	// 만료일 검증: 과거 날짜 차단
 	now := time.Now().Format("2006-01-02 15:04:05")
 
@@ -118,13 +126,13 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 	// DB에 저장
 	query := `
 		INSERT INTO licenses (id, license_key, product_id, policy_id, product_name, customer_name, 
-			customer_email, max_devices, expires_at, status, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			customer_email, max_devices, expires_at, status, created_by, notes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = database.DB.Exec(query,
 		id, licenseKey, productID, policyID, req.ProductName, req.CustomerName,
-		req.CustomerEmail, req.MaxDevices, expiresAtStr, models.LicenseStatusActive,
+		req.CustomerEmail, req.MaxDevices, expiresAtStr, models.LicenseStatusActive, creatorID,
 		req.Notes, now, now,
 	)
 
@@ -153,6 +161,7 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 		MaxDevices:    req.MaxDevices,
 		ExpiresAt:     expiresAtStr,
 		Status:        models.LicenseStatusActive,
+		CreatedBy:     creatorID,
 		Notes:         req.Notes,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -197,45 +206,66 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	search := r.URL.Query().Get("search")
 
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypeLicenses)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate license permissions", err))
+		return
+	}
+
 	// 전체 개수 조회
 	var totalCount int
 	countQuery := "SELECT COUNT(*) FROM licenses WHERE 1=1"
-	var args []interface{}
+	countArgs := make([]interface{}, 0)
 
 	if status != "" {
 		countQuery += " AND status = ?"
-		args = append(args, status)
+		countArgs = append(countArgs, status)
 	}
 	if search != "" {
 		countQuery += " AND (license_key LIKE ? OR customer_name LIKE ? OR customer_email LIKE ?)"
 		searchPattern := "%" + search + "%"
-		args = append(args, searchPattern, searchPattern, searchPattern)
+		countArgs = append(countArgs, searchPattern, searchPattern, searchPattern)
+	}
+	if !isSuper {
+		filterSQL, filterArgs := utils.BuildResourceFilter(scope, "id", "created_by", adminID)
+		countQuery += filterSQL
+		countArgs = append(countArgs, filterArgs...)
 	}
 
-	database.DB.QueryRow(countQuery, args...).Scan(&totalCount)
+	database.DB.QueryRow(countQuery, countArgs...).Scan(&totalCount)
 
 	// 데이터 조회
 	offset := (page - 1) * pageSize
 	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id, l.product_name, 
 		COALESCE(p.policy_name, '') as policy_name,
 		l.customer_name, l.customer_email, l.max_devices,
-		COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
-		l.expires_at, l.status, l.notes, l.created_at, l.updated_at 
+	COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
+	l.expires_at, l.status, l.created_by, l.notes, l.created_at, l.updated_at 
 		FROM licenses l
 		LEFT JOIN policies p ON l.policy_id = p.id
 		WHERE 1=1`
 
+	dataArgs := make([]interface{}, 0)
 	if status != "" {
-		query += " AND status = ?"
+		query += " AND l.status = ?"
+		dataArgs = append(dataArgs, status)
 	}
 	if search != "" {
-		query += " AND (license_key LIKE ? OR customer_name LIKE ? OR customer_email LIKE ?)"
+		query += " AND (l.license_key LIKE ? OR l.customer_name LIKE ? OR l.customer_email LIKE ?)"
+		searchPattern := "%" + search + "%"
+		dataArgs = append(dataArgs, searchPattern, searchPattern, searchPattern)
+	}
+	if !isSuper {
+		filterSQL, filterArgs := utils.BuildResourceFilter(scope, "l.id", "l.created_by", adminID)
+		query += filterSQL
+		dataArgs = append(dataArgs, filterArgs...)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-	args = append(args, pageSize, offset)
+	query += " ORDER BY l.created_at DESC LIMIT ? OFFSET ?"
+	dataArgs = append(dataArgs, pageSize, offset)
 
-	rows, err := database.DB.Query(query, args...)
+	rows, err := database.DB.Query(query, dataArgs...)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to query licenses", err))
@@ -250,7 +280,7 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 			&license.ID, &license.LicenseKey, &license.ProductID, &license.PolicyID, &license.ProductName,
 			&license.PolicyName, &license.CustomerName, &license.CustomerEmail, &license.MaxDevices,
 			&license.ActiveDevices,
-			&license.ExpiresAt, &license.Status, &license.Notes,
+			&license.ExpiresAt, &license.Status, &license.CreatedBy, &license.Notes,
 			&license.CreatedAt, &license.UpdatedAt,
 		)
 		if err != nil {
@@ -298,21 +328,44 @@ func GetLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypeLicenses)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate license permissions", err))
+		return
+	}
+
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeNone) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: license access denied", nil))
+		return
+	}
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeCustom) && !utils.CanAccessResource(scope, id, "", adminID) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: license access denied", nil))
+		return
+	}
+
 	var license models.License
 	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id, l.product_name, 
 		COALESCE(p.policy_name, '') as policy_name,
 		l.customer_name, l.customer_email, l.max_devices,
 		COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
-		l.expires_at, l.status, l.notes, l.created_at, l.updated_at 
+		l.expires_at, l.status, l.created_by, l.notes, l.created_at, l.updated_at 
 		FROM licenses l
 		LEFT JOIN policies p ON l.policy_id = p.id
 		WHERE l.id = ?`
+	args := []interface{}{id}
+	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeOwn) {
+		query += " AND l.created_by = ?"
+		args = append(args, adminID)
+	}
 
-	err := database.DB.QueryRow(query, id).Scan(
+	err = database.DB.QueryRow(query, args...).Scan(
 		&license.ID, &license.LicenseKey, &license.ProductID, &license.PolicyID, &license.ProductName,
 		&license.PolicyName, &license.CustomerName, &license.CustomerEmail, &license.MaxDevices,
 		&license.ActiveDevices,
-		&license.ExpiresAt, &license.Status, &license.Notes,
+		&license.ExpiresAt, &license.Status, &license.CreatedBy, &license.Notes,
 		&license.CreatedAt, &license.UpdatedAt,
 	)
 
@@ -325,6 +378,12 @@ func GetLicense(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to retrieve license", err))
+		return
+	}
+
+	if !isSuper && !utils.CanAccessResource(scope, license.ID, license.CreatedBy, adminID) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: license access denied", nil))
 		return
 	}
 
@@ -561,6 +620,31 @@ func GetLicenseDevices(w http.ResponseWriter, r *http.Request) {
 	if licenseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.ErrorResponse("License ID is required", nil))
+		return
+	}
+
+	scope, isSuper, adminID, err := resolveResourceScope(r, models.ResourceTypeLicenses)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to evaluate license permissions", err))
+		return
+	}
+
+	var owner string
+	if err := database.DB.QueryRow("SELECT created_by FROM licenses WHERE id = ?", licenseID).Scan(&owner); err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(models.ErrorResponse("License not found", nil))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to load license", err))
+		return
+	}
+
+	if !isSuper && !utils.CanAccessResource(scope, licenseID, owner, adminID) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Forbidden: license access denied", nil))
 		return
 	}
 

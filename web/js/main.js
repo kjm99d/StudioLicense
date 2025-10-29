@@ -265,6 +265,12 @@ function setupEventListeners() {
       const adminId = target.dataset.adminId;
       const adminName = target.dataset.adminName;
       if (!adminId) return;
+      const permissions = target.dataset.permissions
+        ? target.dataset.permissions
+            .split(',')
+            .map((perm) => perm.trim())
+            .filter(Boolean)
+        : [];
 
       try {
         if (action === 'reset' && window.resetAdminPassword) {
@@ -272,13 +278,9 @@ function setupEventListeners() {
         } else if (action === 'delete' && window.deleteAdmin) {
           await window.deleteAdmin(adminId, adminName, target);
         } else if (action === 'permissions' && window.openManagePermissionsModal) {
-          const permissions = target.dataset.permissions
-            ? target.dataset.permissions
-                .split(',')
-                .map((perm) => perm.trim())
-                .filter(Boolean)
-            : [];
           await window.openManagePermissionsModal(adminId, adminName, permissions);
+        } else if (action === 'resource-permissions' && window.openManagePermissionsModal) {
+          await window.openManagePermissionsModal(adminId, adminName, permissions, { initialTab: 'resource' });
         }
       } catch (err) {
         console.error('Admin action failed:', err);
