@@ -307,6 +307,17 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// licenseIDFromRequest extracts the license ID from context, path, or query parameters.
+func licenseIDFromRequest(r *http.Request) string {
+	if id, _ := r.Context().Value("path_license_id").(string); strings.TrimSpace(id) != "" {
+		return strings.TrimSpace(id)
+	}
+	if id := r.PathValue("license_id"); strings.TrimSpace(id) != "" {
+		return strings.TrimSpace(id)
+	}
+	return strings.TrimSpace(r.URL.Query().Get("id"))
+}
+
 // GetLicense 라이선스 상세 조회
 // @Summary 라이선스 상세 조회
 // @Description 특정 라이선스의 상세 정보를 조회합니다
@@ -314,14 +325,14 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id query string true "라이선스 ID"
+// @Param id path string true "라이선스 ID"
 // @Success 200 {object} models.APIResponse{data=models.License} "조회 성공"
 // @Failure 400 {object} models.APIResponse "잘못된 요청"
 // @Failure 401 {object} models.APIResponse "인증 필요"
 // @Failure 404 {object} models.APIResponse "라이선스 없음"
-// @Router /api/admin/licenses/ [get]
+// @Router /api/admin/licenses/{id} [get]
 func GetLicense(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	id := licenseIDFromRequest(r)
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.ErrorResponse("License ID is required", nil))
@@ -394,7 +405,7 @@ func GetLicense(w http.ResponseWriter, r *http.Request) {
 
 // UpdateLicense 라이선스 수정
 func UpdateLicense(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	id := licenseIDFromRequest(r)
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.ErrorResponse("License ID is required", nil))
@@ -567,7 +578,7 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 
 // DeleteLicense 라이선스 삭제
 func DeleteLicense(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	id := licenseIDFromRequest(r)
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.ErrorResponse("License ID is required", nil))
@@ -595,7 +606,7 @@ func DeleteLicense(w http.ResponseWriter, r *http.Request) {
 
 // RevokeLicense 라이선스 폐기
 func RevokeLicense(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	id := licenseIDFromRequest(r)
 	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(models.ErrorResponse("License ID is required", nil))

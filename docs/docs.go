@@ -678,7 +678,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/admin/licenses/": {
+        "/api/admin/licenses/{id}": {
             "get": {
                 "security": [
                     {
@@ -701,7 +701,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "라이선스 ID",
                         "name": "id",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],

@@ -232,7 +232,7 @@ export async function reloadDeviceList(licenseId) {
     }
     
     // 상세 창의 디바이스 슬롯 정보도 갱신
-    const licenseRes = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${licenseId}`, {
+    const licenseRes = await apiFetch(`${API_BASE_URL}/api/admin/licenses/${encodeURIComponent(licenseId)}`, {
       _noGlobalLoading: true
     });
     const licenseData = await licenseRes.json();

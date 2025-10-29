@@ -265,7 +265,7 @@ async function updatePolicyDropdown() {
 
 export async function viewLicense(id) {
   try {
-    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${id}`, { headers: { 'Authorization': `Bearer ${state.token}` } });
+    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/${encodeURIComponent(id)}`, { headers: { 'Authorization': `Bearer ${state.token}` } });
     const data = await response.json();
     if (data.status === 'success') {
       const license = data.data;
@@ -330,7 +330,7 @@ export async function deleteLicense(id) {
   const ok = await showConfirm('정말로 이 라이선스를 삭제하시겠습니까?', '라이선스 삭제');
   if (!ok) return;
   try {
-    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${id}`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${state.token}` }
     });
@@ -365,7 +365,7 @@ export async function openEditLicenseModal(licenseId) {
   if (!ensureLicenseManagePermission()) return;
   try {
     // 라이선스 정보 가져오기
-    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${licenseId}`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/${encodeURIComponent(licenseId)}`, {
       headers: { 'Authorization': `Bearer ${state.token}` }
     });
     const data = await response.json();
@@ -460,7 +460,7 @@ export async function handleEditLicense(e) {
   }
 
   try {
-    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/?id=${licenseId}`, {
+    const response = await apiFetch(`${API_BASE_URL}/api/admin/licenses/${encodeURIComponent(licenseId)}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${state.token}`,

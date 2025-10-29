@@ -725,14 +725,14 @@ paths:
       summary: 라이선스 생성
       tags:
       - 관리자 - 라이선스
-  /api/admin/licenses/:
+  /api/admin/licenses/{id}:
     get:
       consumes:
       - application/json
       description: 특정 라이선스의 상세 정보를 조회합니다
       parameters:
       - description: 라이선스 ID
-        in: query
+        in: path
         name: id
         required: true
         type: string

@@ -471,6 +471,17 @@ func licenseHandler(w http.ResponseWriter, r *http.Request) {
 
 // licenseDetailHandler 라이선스 상세/수정/삭제 핸들러
 func licenseDetailHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/admin/licenses/")
+	path = strings.Trim(path, "/")
+	if path != "" {
+		if strings.Contains(path, "/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		ctx := context.WithValue(r.Context(), "path_license_id", path)
+		r = r.WithContext(ctx)
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		if !middleware.EnsurePermission(w, r, models.PermissionLicensesView) {
