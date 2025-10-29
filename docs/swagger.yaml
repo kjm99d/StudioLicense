@@ -112,16 +112,14 @@ definitions:
         description: 정책 ID (선택사항)
         type: string
       product_id:
-        description: 제품 ID (선택사항)
-        type: string
-      product_name:
+        description: 제품 ID
         type: string
     required:
     - customer_email
     - customer_name
     - expires_at
     - max_devices
-    - product_name
+    - product_id
     type: object
   models.CreatePolicyRequest:
     properties:

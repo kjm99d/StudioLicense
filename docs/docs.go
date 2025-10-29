@@ -1900,7 +1900,7 @@ const docTemplate = `{
                 "customer_name",
                 "expires_at",
                 "max_devices",
-                "product_name"
+                "product_id"
             ],
             "properties": {
                 "customer_email": {
@@ -1924,10 +1924,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "product_id": {
-                    "description": "제품 ID (선택사항)",
-                    "type": "string"
-                },
-                "product_name": {
+                    "description": "제품 ID",
                     "type": "string"
                 }
             }

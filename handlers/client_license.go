@@ -51,8 +51,13 @@ func ActivateLicense(w http.ResponseWriter, r *http.Request) {
 	var license models.License
 	var productID sql.NullString
 	var policyID sql.NullString
-	query := `SELECT id, license_key, product_id, policy_id, product_name, customer_name, max_devices, 
-		expires_at, status FROM licenses WHERE license_key = ?`
+	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id,
+		COALESCE(prod.name, '') as product_name,
+		l.customer_name, l.max_devices, 
+		l.expires_at, l.status
+		FROM licenses l
+		LEFT JOIN products prod ON l.product_id = prod.id
+		WHERE l.license_key = ?`
 
 	err := database.DB.QueryRow(query, req.LicenseKey).Scan(
 		&license.ID,
@@ -285,7 +290,12 @@ func ValidateLicense(w http.ResponseWriter, r *http.Request) {
 	var license models.License
 	var productID sql.NullString
 	var policyID sql.NullString
-	query := `SELECT id, license_key, product_id, policy_id, product_name, expires_at, status FROM licenses WHERE license_key = ?`
+	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id,
+		COALESCE(prod.name, '') as product_name,
+		l.expires_at, l.status
+		FROM licenses l
+		LEFT JOIN products prod ON l.product_id = prod.id
+		WHERE l.license_key = ?`
 
 	err := database.DB.QueryRow(query, req.LicenseKey).Scan(
 		&license.ID,

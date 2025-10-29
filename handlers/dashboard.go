@@ -48,12 +48,13 @@ func GetRecentActivities(w http.ResponseWriter, r *http.Request) {
 	// 기본 쿼리 구성 (MySQL/SQLite 모두 호환)
 	baseDevice := `SELECT 'device' AS type, al.action, al.details, al.created_at AS created_at,
 			   CAST(al.id AS CHAR) AS sort_id,
-			   l.license_key, l.customer_name, l.product_name,
+			   l.license_key, l.customer_name, COALESCE(prod.name, '') AS product_name,
 			   d.device_name, d.device_fingerprint,
 			   '' AS admin_username
 		FROM device_activity_logs al
 		JOIN device_activations d ON al.device_id = d.id
-		JOIN licenses l ON al.license_id = l.id`
+		JOIN licenses l ON al.license_id = l.id
+		LEFT JOIN products prod ON l.product_id = prod.id`
 	baseAdmin := `SELECT 'admin' AS type, a.action, a.details, a.created_at AS created_at,
 			   CAST(a.id AS CHAR) AS sort_id,
 			   '' AS license_key, '' AS customer_name, '' AS product_name,

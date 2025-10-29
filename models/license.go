@@ -31,9 +31,8 @@ const (
 
 // CreateLicenseRequest 라이선스 생성 요청
 type CreateLicenseRequest struct {
-	ProductID     string `json:"product_id"` // 제품 ID (선택사항)
-	PolicyID      string `json:"policy_id"`  // 정책 ID (선택사항)
-	ProductName   string `json:"product_name" binding:"required"`
+	ProductID     string `json:"product_id" binding:"required"` // 제품 ID
+	PolicyID      string `json:"policy_id"`                     // 정책 ID (선택사항)
 	CustomerName  string `json:"customer_name" binding:"required"`
 	CustomerEmail string `json:"customer_email" binding:"required,email"`
 	MaxDevices    int    `json:"max_devices" binding:"required,min=1"`
@@ -44,7 +43,6 @@ type CreateLicenseRequest struct {
 // UpdateLicenseRequest 라이선스 수정 요청
 type UpdateLicenseRequest struct {
 	PolicyID      string `json:"policy_id"` // 정책 ID (선택사항, 빈 문자열이면 정책 제거)
-	ProductName   string `json:"product_name"`
 	CustomerName  string `json:"customer_name"`
 	CustomerEmail string `json:"customer_email"`
 	MaxDevices    int    `json:"max_devices"`

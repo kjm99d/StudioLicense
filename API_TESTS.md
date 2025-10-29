@@ -25,8 +25,8 @@ Invoke-RestMethod -Uri "http://localhost:8080/api/admin/licenses" `
     "Content-Type" = "application/json"
   } `
   -Body (@{
-    product_name = "MyApp Pro"
-    product_version = "1.0.0"
+    # product_id 값은 /api/admin/products 응답에서 확인하세요
+    product_id = "prod_123456789"
     customer_name = "홍길동"
     customer_email = "hong@example.com"
     max_devices = 2

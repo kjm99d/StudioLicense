@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"studiolicense/logger"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -39,10 +38,6 @@ func Initialize(dsn string) error {
 	// 기본 관리자 계정 생성
 	if err := createDefaultAdmin(); err != nil {
 		return fmt.Errorf("failed to create default admin: %w", err)
-	}
-
-	if err := ensureResourceCreatorColumns(); err != nil {
-		return fmt.Errorf("failed to ensure resource creator columns: %w", err)
 	}
 
 	// 슈퍼 관리자 보장: 기존 DB에서 super_admin이 하나도 없으면 가장 오래된 관리자 1명을 승격
@@ -143,7 +138,6 @@ func createTables() error {
 			license_key VARCHAR(255) UNIQUE NOT NULL,
 			product_id VARCHAR(50),
 			policy_id VARCHAR(50),
-			product_name VARCHAR(255) NOT NULL,
 			customer_name VARCHAR(255) NOT NULL,
 			customer_email VARCHAR(100) NOT NULL,
 			max_devices INT NOT NULL DEFAULT 1,
@@ -291,36 +285,6 @@ func ensureDeviceViewPermissionBackfill() error {
 		WHERE permission = 'devices.manage'
 	`)
 	return err
-}
-
-func ensureResourceCreatorColumns() error {
-	statements := []string{
-		`ALTER TABLE products ADD COLUMN created_by VARCHAR(50) NULL`,
-		`ALTER TABLE products ADD INDEX idx_products_created_by (created_by)`,
-		`ALTER TABLE policies ADD COLUMN created_by VARCHAR(50) NULL`,
-		`ALTER TABLE policies ADD INDEX idx_policies_created_by (created_by)`,
-		`ALTER TABLE licenses ADD COLUMN created_by VARCHAR(50) NULL`,
-		`ALTER TABLE licenses ADD INDEX idx_licenses_created_by (created_by)`,
-	}
-	for _, stmt := range statements {
-		if _, err := DB.Exec(stmt); err != nil {
-			if !isIgnorableSchemaError(err) {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func isIgnorableSchemaError(err error) bool {
-	if err == nil {
-		return true
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "duplicate column") ||
-		strings.Contains(msg, "duplicate key") ||
-		strings.Contains(msg, "already exists") ||
-		strings.Contains(msg, "check that column/key exists")
 }
 
 // contains 문자열 포함 여부 확인

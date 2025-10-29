@@ -443,7 +443,6 @@ export async function handleEditLicense(e) {
   
   const licenseId = document.getElementById('edit_license_id').value;
   const policyId = document.getElementById('edit_policy_select').value;
-  const productName = document.getElementById('edit_product_name').value;
   const customerName = document.getElementById('edit_customer_name').value;
   const customerEmail = document.getElementById('edit_customer_email').value;
   const maxDevices = parseInt(document.getElementById('edit_max_devices').value);
@@ -468,7 +467,6 @@ export async function handleEditLicense(e) {
       },
       body: JSON.stringify({
         policy_id: policyId,
-        product_name: productName,
         customer_name: customerName,
         customer_email: customerEmail,
         max_devices: maxDevices,

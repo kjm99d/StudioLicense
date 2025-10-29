@@ -65,25 +65,29 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 제품 ID가 있으면 제품 정보 조회
-	var productID *string
-	if req.ProductID != "" {
-		var productName string
-		query := "SELECT name FROM products WHERE id = ? AND status = 'active'"
-		err := database.DB.QueryRow(query, req.ProductID).Scan(&productName)
+	// 제품 ID는 필수이며 활성 제품이어야 합니다.
+	req.ProductID = strings.TrimSpace(req.ProductID)
+	if req.ProductID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Product ID is required", nil))
+		return
+	}
 
+	var productName string
+	productQuery := "SELECT name FROM products WHERE id = ? AND status = 'active'"
+	if err := database.DB.QueryRow(productQuery, req.ProductID).Scan(&productName); err != nil {
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(models.ErrorResponse("Product not found or inactive", nil))
 			return
 		}
 
-		if err == nil {
-			productID = &req.ProductID
-			req.ProductName = productName
-			// 제품 버전은 사용하지 않음
-		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(models.ErrorResponse("Failed to verify product", err))
+		return
 	}
+	productID := req.ProductID
+	productIDPtr := &productID
 
 	// 정책 ID가 있으면 정책 존재 여부만 확인
 	var policyID *string
@@ -125,13 +129,13 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 
 	// DB에 저장
 	query := `
-		INSERT INTO licenses (id, license_key, product_id, policy_id, product_name, customer_name, 
+		INSERT INTO licenses (id, license_key, product_id, policy_id, customer_name, 
 			customer_email, max_devices, expires_at, status, created_by, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = database.DB.Exec(query,
-		id, licenseKey, productID, policyID, req.ProductName, req.CustomerName,
+		id, licenseKey, productID, policyID, req.CustomerName,
 		req.CustomerEmail, req.MaxDevices, expiresAtStr, models.LicenseStatusActive, creatorID,
 		req.Notes, now, now,
 	)
@@ -153,9 +157,9 @@ func CreateLicense(w http.ResponseWriter, r *http.Request) {
 	license := models.License{
 		ID:            id,
 		LicenseKey:    licenseKey,
-		ProductID:     productID,
+		ProductID:     productIDPtr,
 		PolicyID:      policyID,
-		ProductName:   req.ProductName,
+		ProductName:   productName,
 		CustomerName:  req.CustomerName,
 		CustomerEmail: req.CustomerEmail,
 		MaxDevices:    req.MaxDevices,
@@ -237,13 +241,15 @@ func GetLicenses(w http.ResponseWriter, r *http.Request) {
 
 	// 데이터 조회
 	offset := (page - 1) * pageSize
-	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id, l.product_name, 
-		COALESCE(p.policy_name, '') as policy_name,
+	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id,
+		COALESCE(prod.name, '') as product_name,
+		COALESCE(pol.policy_name, '') as policy_name,
 		l.customer_name, l.customer_email, l.max_devices,
 	COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
 	l.expires_at, l.status, l.created_by, l.notes, l.created_at, l.updated_at 
 		FROM licenses l
-		LEFT JOIN policies p ON l.policy_id = p.id
+		LEFT JOIN products prod ON l.product_id = prod.id
+		LEFT JOIN policies pol ON l.policy_id = pol.id
 		WHERE 1=1`
 
 	dataArgs := make([]interface{}, 0)
@@ -358,13 +364,15 @@ func GetLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var license models.License
-	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id, l.product_name, 
-		COALESCE(p.policy_name, '') as policy_name,
+	query := `SELECT l.id, l.license_key, l.product_id, l.policy_id,
+		COALESCE(prod.name, '') as product_name,
+		COALESCE(pol.policy_name, '') as policy_name,
 		l.customer_name, l.customer_email, l.max_devices,
 		COALESCE((SELECT COUNT(*) FROM device_activations WHERE license_id = l.id AND status = 'active'), 0) as active_devices,
 		l.expires_at, l.status, l.created_by, l.notes, l.created_at, l.updated_at 
 		FROM licenses l
-		LEFT JOIN policies p ON l.policy_id = p.id
+		LEFT JOIN products prod ON l.product_id = prod.id
+		LEFT JOIN policies pol ON l.policy_id = pol.id
 		WHERE l.id = ?`
 	args := []interface{}{id}
 	if !isSuper && strings.EqualFold(scope.Mode, models.ResourceModeOwn) {
@@ -479,12 +487,12 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// policy_id 포함한 업데이트 쿼리
-	query := `UPDATE licenses SET product_name = ?, customer_name = ?,
+	query := `UPDATE licenses SET customer_name = ?,
 		customer_email = ?, max_devices = ?, expires_at = ?, notes = ?, policy_id = ?, updated_at = ?
 		WHERE id = ?`
 
 	_, err := database.DB.Exec(query,
-		req.ProductName, req.CustomerName,
+		req.CustomerName,
 		req.CustomerEmail, req.MaxDevices, expiresAtStr, req.Notes,
 		policyID,
 		time.Now().Format("2006-01-02 15:04:05"), id,
@@ -556,9 +564,6 @@ func UpdateLicense(w http.ResponseWriter, r *http.Request) {
 
 		// 변경 내역을 상세히 기록
 		var changes []string
-		if req.ProductName != "" {
-			changes = append(changes, fmt.Sprintf("제품명: %s", req.ProductName))
-		}
 		if req.CustomerName != "" {
 			changes = append(changes, fmt.Sprintf("고객명: %s", req.CustomerName))
 		}
